@@ -32,9 +32,9 @@ Upon running the raytracer, a window will open, showing the interactive user int
 
 This raytracer was built with the help of the following fantastic libraries:
 
-	[ImGui](https://github.com/ocornut/imgui) for the interactive user interface.
-	[GLAD](https://glad.dav1d.de/) for OpenGL loading.
-	[GLFW](https://www.glfw.org/) for window management and input handling.
-	[GLM](https://github.com/g-truc/glm) for mathematics operations.
-	[OBJ Loader](https://github.com/Bly7/OBJ-Loader) for loading 3D models in OBJ format.
-	[stb_image](https://github.com/nothings/stb) for image loading and saving.
+[ImGui](https://github.com/ocornut/imgui) for the interactive user interface.
+[GLAD](https://glad.dav1d.de/) for OpenGL loading.
+[GLFW](https://www.glfw.org/) for window management and input handling.
+[GLM](https://github.com/g-truc/glm) for mathematics operations.
+[OBJ Loader](https://github.com/Bly7/OBJ-Loader) for loading 3D models in OBJ format.
+[stb_image](https://github.com/nothings/stb) for image loading and saving.
