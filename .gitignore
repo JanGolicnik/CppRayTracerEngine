@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+/myPbrt/myPbrt.vcxproj
+/myPbrt/myPbrt.vcxproj.filters
+/myPbrt/myPbrt.vcxproj.user
+/x64
+/myPbrt/x64
+/.vs/myPbrt
