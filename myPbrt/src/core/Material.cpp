@@ -14,7 +14,7 @@ namespace MyPBRT {
 	int MetallicMaterial::selected_texture = 0;
 	int GlassMaterial::selected_texture = 0;
 
-	glm::vec3 DiffuseMaterial::Evaluate(SurfaceInteraction* interaction, const glm::vec3& wo, const glm::vec3& wi, glm::vec3* light) const
+	glm::vec3 DiffuseMaterial::Evaluate(SurfaceInteraction* interaction) const
 	{
 		if (texture) {
 			return texture->Evaluate(*interaction);
@@ -22,13 +22,17 @@ namespace MyPBRT {
 		return glm::vec3(1, 0, 1);
 	}
 
-	bool DiffuseMaterial::ScatterRay(const SurfaceInteraction& interaction, Ray* ray) const
+	bool DiffuseMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const
 	{
-		glm::vec3 scattered = random_in_unit_sphere();
-		glm::vec3 reflected = glm::reflect(glm::normalize(ray->d), interaction.normal);
-		ray->d = (1.0f - smoothness) * scattered +  smoothness * reflected;
-		if (glm::dot(ray->d, interaction.normal) < 0) {
-			ray->d = -ray->d;
+		glm::vec3 scattered = random_cosine_direction();
+		//glm::vec3 scattered = random_in_unit_hemisphere(interaction.normal);
+		glm::vec3 reflected = glm::reflect(glm::normalize(dir), interaction.normal);
+		dir = (1.0f - smoothness) * scattered + smoothness * reflected;
+
+
+		dir = random_cosine_direction();
+		if (glm::dot(dir, interaction.normal) < 0) {
+			dir = -dir;
 		}
 		return true;
 	}
@@ -53,17 +57,26 @@ namespace MyPBRT {
 			}
 		}
 	}
-
-	glm::vec3 EmissiveMaterial::Evaluate(SurfaceInteraction* interaction, const glm::vec3& wo, const glm::vec3& wi, glm::vec3* light) const
+	float DiffuseMaterial::Pdf_Value(const glm::vec3& direction, const glm::vec3& normal) const
+	{
+		float cosine_theta = glm::dot(glm::normalize(direction), normal);
+		return fmax(0, cosine_theta * INVPIf);
+	//	return glm::dot(incoming, normal) * INVPIf;
+	}
+	glm::vec3 EmissiveMaterial::EvaluateLight(const SurfaceInteraction& interaction) const
 	{
 		if (texture) {
-			glm::vec4 tex = texture->Evaluate(*interaction);
-			*light += emission * glm::vec3(tex.x, tex.y, tex.z);
+			glm::vec4 tex = texture->Evaluate(interaction);
+			return emission * glm::vec3(tex.x, tex.y, tex.z);
 		}
+		return glm::vec3(1.0f);
+	};
+	glm::vec3 EmissiveMaterial::Evaluate(SurfaceInteraction* interaction) const
+	{
 		return glm::vec3(1.0f);
 	}
 
-	bool EmissiveMaterial::ScatterRay(const SurfaceInteraction& interaction, Ray* ray) const
+	bool EmissiveMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const
 	{
 		return false;
 	}
@@ -89,7 +102,7 @@ namespace MyPBRT {
 		}
 	}
 
-	glm::vec3 MetallicMaterial::Evaluate(SurfaceInteraction* interaction, const glm::vec3& wo, const glm::vec3& wi, glm::vec3* light) const
+	glm::vec3 MetallicMaterial::Evaluate(SurfaceInteraction* interaction) const
 	{
 		if (texture) {
 			return texture->Evaluate(*interaction);
@@ -97,11 +110,11 @@ namespace MyPBRT {
 		return glm::vec3(1, 0, 1);
 	}
 
-	bool MetallicMaterial::ScatterRay(const SurfaceInteraction& interaction, Ray* ray) const
+	bool MetallicMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const
 	{
 		glm::vec3 scattered = roughness * random_in_unit_sphere();
-		glm::vec3 reflected = glm::reflect(glm::normalize(ray->d), interaction.normal);
-		ray->d = glm::normalize(scattered + reflected);
+		glm::vec3 reflected = glm::reflect(glm::normalize(dir), interaction.normal);
+		dir = glm::normalize(scattered + reflected);
 		return true;
 	}
 
@@ -126,7 +139,7 @@ namespace MyPBRT {
 		}
 	}
 
-	glm::vec3 GlassMaterial::Evaluate(SurfaceInteraction* interaction, const glm::vec3& wo, const glm::vec3& wi, glm::vec3* light) const
+	glm::vec3 GlassMaterial::Evaluate(SurfaceInteraction* interaction) const
 	{
 		return glm::vec3(1.0f);
 	}
@@ -154,10 +167,10 @@ namespace MyPBRT {
 		return Fresnel;
 	}
 
-	bool GlassMaterial::ScatterRay(const SurfaceInteraction& interaction, Ray* ray) const
+	bool GlassMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const
 	{
 		glm::vec3 normal = interaction.normal;
-		glm::vec3 unit_direction = glm::normalize(ray->d);
+		glm::vec3 unit_direction = glm::normalize(dir);
 		float refraction_ratio = glm::dot(unit_direction, normal) < 0 ? (1.0 / ior) : ior;
 
 		double cos_theta = glm::abs(glm::dot(-unit_direction, normal));
@@ -167,12 +180,12 @@ namespace MyPBRT {
 
 		glm::vec3 scattered = roughness * random_in_unit_sphere();
 		normal = glm::normalize(normal + scattered);
-		double rand = random_double_bad();
+		double rand = random_double();
 
 		if (reflectance > rand)
-			ray->d = glm::reflect(unit_direction, normal);
+			dir = glm::reflect(unit_direction, normal);
 		else
-			ray->d = glm::refract(unit_direction, normal, refraction_ratio);
+			dir = glm::refract(unit_direction, normal, refraction_ratio);
 
 		return true;
 	}

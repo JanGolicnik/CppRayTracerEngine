@@ -4,7 +4,8 @@
 #include "Scene.h"
 #include "Material.h"
 #include "Object.h"
-#include "Shape.h"
+#include "Mesh.h"
+#include "Light.h"
 
 #include <glm/geometric.hpp>
 
@@ -20,8 +21,6 @@ namespace MyPBRT {
 	}
 	void Integrator::Render(const Scene& scene, const Camera& camera)
 	{
-		scene.Preprocess();
-
 		active_camera = &camera;
 		active_scene = &scene;
 
@@ -32,7 +31,7 @@ namespace MyPBRT {
 		case RenderingType::Wireframe:
 			RenderWireframe();
 			break;
-		case RenderingType::Shaded:
+		case RenderingType::Rasterized:
 			RenderRasterized();
 			break;
 		default:
@@ -80,6 +79,80 @@ namespace MyPBRT {
 #endif
 	}
 
+	glm::vec3 Integrator::TraceRay(Ray* ray, int depth) const
+	{
+		SurfaceInteraction interaction;
+		interaction.wo = glm::vec3(-1.0f);
+		glm::vec3 color(0.0f);
+		glm::vec3 contribution(1.0f);
+
+		while (depth < bounces) {
+			depth++;
+
+			if (!active_scene->IntersectAccel(*ray, &interaction)) {
+
+				if (world_texture) {
+					glm::vec3 spherePos = glm::normalize(ray->d);
+					float theta = acos(-spherePos.y);
+					float phi = atan2(-spherePos.z, spherePos.x) + PIf;
+					interaction.uv = glm::vec2(phi / (2.0f * PIf), theta / PIf);
+					glm::vec4 col = world_texture->Evaluate(interaction);
+					color += glm::vec3(col.x, col.y, col.z);
+				}
+				else {
+					float t = 0.5f * (ray->d.y + 1.0f);
+					glm::vec3 skylight = glm::vec3(1.0f - t) * glm::vec3(1.0, 1.0, .8) + glm::vec3(t) * glm::vec3(0.5, 0.7, 1.0);
+					color += skylight * 1.075f;
+				}
+
+				break;
+			}
+
+
+			glm::vec3 wo = glm::normalize(-ray->d);
+			const std::shared_ptr<Material>& material = active_scene->materials[active_scene->objects[interaction.primitive].material];
+			
+			color += material->EvaluateLight(interaction);
+			glm::vec3 materialColor = material->Evaluate(&interaction);
+
+			if (material->has_pdf) {
+
+				if (active_scene->lights.size() > 0)
+				{
+					int index = random_int(0, active_scene->lights.size() - 1);
+					const std::shared_ptr<Light>& light = active_scene->lights[index];
+					glm::vec3 point_on_light = light->Sample(interaction);
+					ray->d = point_on_light - interaction.pos;
+
+					if (glm::dot(interaction.normal, ray->d) < 0) goto scatterMaterial;
+					ray->tMax = glm::distance(point_on_light, interaction.pos);
+					if (active_scene->hasIntersectionsAccel(*ray)) goto scatterMaterial;
+
+					float light_pdf = light->PDF_Value(interaction, ray->d);
+					color += light->Color() / light_pdf;
+				}
+				scatterMaterial:
+				material->ScatterRay(interaction, ray->d);
+			
+				float pdf = material->Pdf_Value(ray->d, interaction.normal);
+				contribution *= materialColor / pdf;
+
+			}
+			else {
+				if (!material->ScatterRay(interaction, ray->d)) {
+					break;
+				}
+
+				contribution *= materialColor;
+			}
+
+			ray->o = interaction.pos;
+			ray->tMax = std::numeric_limits<float>::max();
+		}
+
+		return color * glm::clamp(contribution, 0.0f, 1.0f);
+	}
+
 	void Integrator::RenderWireframe()
 	{
 		std::for_each(std::execution::par, height_iterator.begin(), height_iterator.end(), [this](uint32_t y) {
@@ -102,17 +175,35 @@ namespace MyPBRT {
 		frame = 1;
 		Clear();
 
-		for (auto& prim : active_scene->primitives) {
-			std::vector<std::vector<std::pair<RasterPixel, RasterPixel>>> shapes = prim.shape->GetRasterizedEdges(*active_camera);
+		//every primitive gives us back a vector of shapes (=a vector of edges) which are rasterized first with bersenhem 
+		//and then the scanlines are filled, normals, uv and depth are linearly interpolated
+		for (int obj = 0; obj < active_scene->objects.size(); obj++) {
+			std::vector<std::vector<std::pair<RasterPixel, RasterPixel>>> shapes = active_scene->ObjectToMesh(obj).GetRasterizedEdges(*active_camera);
+			
+			//cull shapes that are outside the view 
+			for (int i = 0; i < shapes.size(); i++) {
+				bool inside = false;
+				for (auto& edge : shapes[i]) {
+					edge.first.screen_positon = glm::ivec2(edge.first.normalized_position.x * render_resolution.x, edge.first.normalized_position.y * render_resolution.y);
+					inside |= edge.first.screen_positon.x > 0 && edge.first.screen_positon.x < render_resolution.x;
+					inside |= edge.first.screen_positon.y > 0 && edge.first.screen_positon.y < render_resolution.y;
+				
+					edge.second.screen_positon = glm::ivec2(edge.second.normalized_position.x * render_resolution.x, edge.second.normalized_position.y * render_resolution.y);
+					inside |= edge.second.screen_positon.x > 0 && edge.second.screen_positon.x < render_resolution.x;
+					inside |= edge.second.screen_positon.y > 0 && edge.second.screen_positon.y < render_resolution.y;
+				}
+				if (!inside) {
+					shapes.erase(shapes.begin() + i);
+					i--;
+				}
+			}
 
+			//get all edges and then fill in scanlines
 			for (auto& shape : shapes) {
-				std::unordered_map<int, std::pair<RasterPixel, RasterPixel>> points_per_scanline;
 				std::vector<RasterPixel> points;
 
+				//get and interpolate all the points on every edge
 				for (auto& edge : shape) {
-					edge.first.screen_positon = glm::ivec2(edge.first.normalized_position.x * render_resolution.x, edge.first.normalized_position.y * render_resolution.y);
-					edge.second.screen_positon = glm::ivec2(edge.second.normalized_position.x * render_resolution.x, edge.second.normalized_position.y * render_resolution.y);
-
 					glm::vec2 dir = edge.second.screen_positon - edge.first.screen_positon;
 
 					float length = glm::length(dir);
@@ -137,6 +228,10 @@ namespace MyPBRT {
 					}
 				}
 
+				//get the left and rightmost points on every scanline
+
+				std::unordered_map<int, std::pair<RasterPixel, RasterPixel>> points_per_scanline;
+
 				for (auto& point : points) {
 					if (points_per_scanline.count(point.screen_positon.y) <= 0)
 						points_per_scanline[point.screen_positon.y] = { point, point };
@@ -149,8 +244,10 @@ namespace MyPBRT {
 					}
 				}
 
+				//fill in the space between the left and rightmost points, 
+				//lineraly interpolate the data then use gooch shading and set the pixel color
 
-				std::for_each(points_per_scanline.begin(), points_per_scanline.end(), [this](std::unordered_map<int, std::pair<RasterPixel, RasterPixel>>::value_type& pair) {
+				std::for_each(std::execution::par, points_per_scanline.begin(), points_per_scanline.end(), [this](std::unordered_map<int, std::pair<RasterPixel, RasterPixel>>::value_type& pair) {
 					int y = pair.first;
 					RasterPixel* p1 = &pair.second.first, * p2 = &pair.second.second;
 					if (p1->screen_positon.x > p2->screen_positon.x) {
@@ -159,9 +256,16 @@ namespace MyPBRT {
 					int dist = p2->screen_positon.x - p1->screen_positon.x;
 					float inverse_dist = 1.0f / (float)dist;
 
+					//cull if both xs are out of range
+					if (p2->screen_positon.x < 0 || p1->screen_positon.x > render_resolution.x) return;
+
 					for (int i = 0; i < dist; i++) {
 						int x = p1->screen_positon.x + i;
-						if (x >= render_resolution.x || x < 0) continue;
+						if (x < 0) {
+							i += -x;
+							continue;
+						}
+						if (x >= render_resolution.x) break;
 
 						float ratio = i * inverse_dist;
 						float one_minus_ratio = 1.0f - ratio;
@@ -188,13 +292,10 @@ namespace MyPBRT {
 
 				});
 			}
-
-
 			
 		}
 
 	}
-
 
 	void Integrator::OnResize(const glm::ivec2& size)
 	{
@@ -241,51 +342,6 @@ namespace MyPBRT {
 		return output_image;
 	}
 
-	glm::vec3 Integrator::TraceRay(Ray* ray, int depth) const
-	{
-		SurfaceInteraction interaction;
-
-		glm::vec3 light(0.0f);
-		glm::vec3 contribution(1.0f);
-
-		while (depth < bounces) {
-			depth++;
-
-			if (!active_scene->IntersectAccel(*ray, &interaction)) {
-
-				if (world_texture) {
-					glm::vec3 spherePos = glm::normalize(ray->d);
-					float theta = acos(-spherePos.y);
-					float phi = atan2(-spherePos.z, spherePos.x) + PIf;
-					interaction.uv = glm::vec2(phi / (2.0f * PIf), theta / PIf);
-					glm::vec4 col = world_texture->Evaluate(interaction);
-					light += glm::vec3(col.x, col.y, col.z);
-				}
-				else {
-					float t = 0.5f * (ray->d.y + 1.0f);
-					glm::vec3 skylight = glm::vec3(1.0f - t) * glm::vec3(1.0, 1.0, .8) + glm::vec3(t) * glm::vec3(0.5, 0.7, 1.0);
-					light += skylight * 1.075f;
-				}
-
-				break;
-			}
-
-			glm::vec3 wo = interaction.wo;
-			std::shared_ptr<Material> material = active_scene->materials[active_scene->primitives[interaction.primitive].material];
-			glm::vec3 materialColor = material->Evaluate(&interaction, wo, ray->d, &light);
-
-			contribution *= materialColor;
-
-			ray->o = interaction.pos;
-			if (!material->ScatterRay(interaction, ray)) {
-				break;
-			}
-			ray->tMax = std::numeric_limits<float>::max();
-		}
-		
-		return light * glm::clamp(contribution, 0.0f, 1.0f);
-	}
-
 	void Integrator::DrawOverlays()
 	{
 		switch (overlay_type) {
@@ -296,7 +352,7 @@ namespace MyPBRT {
 			break;
 		case OverlayType::Selection:
 			for (auto& obj : selected_objects) {
-				active_scene->primitives[obj].DrawLines(render_resolution, *active_camera, overlay_color, set_pixel_uint32);
+				active_scene->ObjectToMesh(obj).DrawLines(render_resolution, *active_camera, overlay_color, set_pixel_uint32);
 			}
 			break;
 		}
@@ -310,6 +366,10 @@ namespace MyPBRT {
 			OnResize(image_resolution);
 		}
 
+		if (ImGui::Checkbox("render depth? [WIP]", &depth_only)) {
+			ResetFrameIndex();
+		}
+
 		ImGui::Combo("Engine ?", (int*)&rendering_type, rendering_options, IM_ARRAYSIZE(rendering_options));
 		
 		if (prevType != rendering_type) OnResize(image_resolution);
@@ -319,7 +379,7 @@ namespace MyPBRT {
 			ImGui::DragInt("bounces", &bounces, 1, 0, std::numeric_limits<int>::max());
 			Texture::CreateTextureFromMenuFull(&selected_world_texture, &world_texture, world_texture_types);
 			break;
-		case MyPBRT::Integrator::RenderingType::Shaded:
+		case MyPBRT::Integrator::RenderingType::Rasterized:
 			ImGui::ColorPicker3("Cool", glm::value_ptr(gooch_cool));
 			ImGui::ColorPicker3("Warm", glm::value_ptr(gooch_warm));
 			break;

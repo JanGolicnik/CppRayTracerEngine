@@ -3,10 +3,11 @@
 This is a C++ software raytracer that provides an interactive experience for creating and rendering scenes
 ## Features
 
-	Lambertian, metallic, glass, emmisive materials all with varius textures and normal maps to enhance the visuals
-	Support for triangle meshes and spheres
+	Lambertian, metallic, glass, emmisive materials all with varius textures and normal maps to enhance the visuals.
 	Interactive user interface using ImGui for scene setup and control.
 	Supports loading 3D models in OBJ format using the obj_loader library.
+	Wireframe and rasterized views for easier editing.
+	Accelerated ray intersections with bounding volume heirarchies for real time performance.
 
 ## Prerequisites
 
@@ -22,8 +23,8 @@ Before you can build and run the raytracer, ensure you have the following depend
 
 Upon running the raytracer, a window will open, showing the interactive user interface powered by ImGui. The interface allows you to:
 
+	Use the right mouse button and wasd to move the manupulate the camera.
 	Load 3D models in OBJ format to be included in the raytraced scene.
-	Manipulate the camera position and orientation.
 	Adjust the material properties of objects, such as color, reflection, and transparency.
 	Add custom image textures and normal maps.
 	Control the lighting in the scene.

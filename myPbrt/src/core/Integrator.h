@@ -17,7 +17,7 @@ namespace MyPBRT {
 		enum class RenderingType {
 			PBR = 0,
 			Wireframe = 1,
-			Shaded = 2
+			Rasterized = 2
 		};
 
 		enum class OverlayType {
@@ -41,7 +41,7 @@ namespace MyPBRT {
 		
 		bool depth_only = false;
 
-		const char* rendering_options[3] = { "PBR", "Wireframe", "Shaded" };
+		const char* rendering_options[3] = { "PBR", "Wireframe", "Rasterized" };
 		RenderingType rendering_type = RenderingType::PBR;
 		const char* overlay_options[3] = { "None", "Selection", "All" };
 		OverlayType overlay_type = OverlayType::Selection;

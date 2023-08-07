@@ -7,6 +7,8 @@
 
 #include "Object.h"
 #include "Material.h"
+#include "Light.h"
+#include "Mesh.h"
 
 #include "BVHAccelerator.h"
 
@@ -37,6 +39,7 @@ namespace MyPBRT {
             integrator.ResetFrameIndex();
             integrator.Clear();
         }
+        scene.Preprocess();
         integrator.Render(scene, camera);
     }
 
@@ -59,7 +62,7 @@ namespace MyPBRT {
                 std::cout << interaction.uv.x << " " << interaction.uv.y << "\n";
                 if(!holding_shift)
                     integrator.selected_objects.clear();
-                if (interaction.primitive >= 0 && interaction.primitive < scene.primitives.size())
+                if (interaction.primitive >= 0 && interaction.primitive < scene.objects.size())
                     integrator.selected_objects.insert(interaction.primitive);
             }
             holding_lmouse = true;
@@ -81,13 +84,6 @@ namespace MyPBRT {
         if (key == 340) {
             holding_shift = true;
         }
-        //if (key == 48) {
-        //    uint32_t s = time(NULL);
-        //    for (int i = 0; i < 4; i++) {
-        //        std::shared_ptr<MyPBRT::Shape> ss(new MyPBRT::Sphere(RandomInHemisphere(time(NULL)) * 10.0f * RandomFloat(&s), RandomFloat(&s) * 2.0f));
-        //        scene.AddObject(Object(ss, 0));
-        //    }
-        //}
         if (key == 84) {
             scene.Build();
         }
@@ -139,14 +135,6 @@ namespace MyPBRT {
     {
         ImGui::Begin("Scene");
         
-        if (ImGui::CollapsingHeader("Add a sphere")) {
-            ImGui::DragFloat3("Position", &next_sphere_pos[0], .1, -1000.0f, 1000.0f);
-            ImGui::DragFloat("Radius", &next_sphere_radius, .1, -1000.0f, 1000.0f);
-            if (ImGui::Button("Add")) {
-                std::shared_ptr<MyPBRT::Shape> ss(new MyPBRT::Sphere(next_sphere_pos, next_sphere_radius));
-                scene.AddObject(Object(ss, 0));
-            }
-        }
         if (ImGui::CollapsingHeader("Load a .obj")) {
             ImGui::InputText("Filename", &obj_file_to_load);
             if (ImGui::IsItemHovered())
@@ -157,15 +145,39 @@ namespace MyPBRT {
         }
 
         if (ImGui::CollapsingHeader("Primitives")) {
-            for (int i = 0; i < scene.primitives.size(); i++) {
+            for (int i = 0; i < scene.objects.size(); i++) {
                 ImGui::PushID(i);
-                if (scene.primitives[i].CreateIMGUI(scene.materials)) {
-                    scene.RecalculateObject(i);
-                }
+                bool changed = scene.objects[i].CreateIMGUI(scene.materials);
+                changed |= scene.ObjectToMesh(i).CreateIMGUI();
                 if (ImGui::Button("Delete")) {
                     scene.RemoveObject(i);
                     i--;
                     integrator.selected_objects.clear();
+                    integrator.ResetFrameIndex();
+                }
+                if (changed) {
+                    scene.RecalculateObject(i);
+                    integrator.ResetFrameIndex();
+                }
+                
+                ImGui::PopID();
+            }
+        }
+
+        if (ImGui::CollapsingHeader("Lights")) {
+
+            if (ImGui::Button("Add a light")) {
+                scene.lights.emplace_back(new SphericalLight(glm::vec3(1), 100, glm::vec3(0), .2f));
+            }
+
+            for (int i = 0; i < scene.lights.size(); i++) {
+                ImGui::PushID(scene.objects.size() + i);
+                if (scene.lights[i]->CreateIMGUI()) {
+                    integrator.ResetFrameIndex();
+                }
+                if (ImGui::Button("Delete")) {
+                    scene.lights.erase(scene.lights.begin() + i);
+                    i--;
                 }
                 ImGui::PopID();
             }
@@ -197,8 +209,8 @@ namespace MyPBRT {
             scene.materials[i]->IMGUI_Edit();
             if (ImGui::Button("Delete")) {
                 scene.materials.erase(scene.materials.begin() + i);
-                for (int j = 0; j < scene.primitives.size(); j++) {
-                    int* mat = &scene.primitives[j].material;
+                for (int j = 0; j < scene.objects.size(); j++) {
+                    int* mat = &scene.objects[j].material;
                     if (*mat == i) *mat = 0; else
                         if (*mat > i) (*mat)--;
                 }
@@ -224,12 +236,16 @@ namespace MyPBRT {
         if (integrator.selected_objects.size() == 1) {
             ImGui::Begin("Selection");
             int obj = *integrator.selected_objects.begin();
-            if (scene.primitives[obj].CreateIMGUI(scene.materials)) {
+            bool changed = scene.objects[obj].CreateIMGUI(scene.materials);
+            changed |= scene.ObjectToMesh(obj).CreateIMGUI();
+            if (changed) {
                 scene.RecalculateObject(obj);
+                integrator.ResetFrameIndex();
             }
             if (ImGui::Button("Delete")) {
                 scene.RemoveObject(obj);
                 integrator.selected_objects.clear();
+                integrator.ResetFrameIndex();
             }
             ImGui::End();
             return;
@@ -237,8 +253,8 @@ namespace MyPBRT {
 
         glm::vec3 center(0.0f);
         for (auto& object_id : integrator.selected_objects) {
-            Object* object = &scene.primitives[object_id];
-            center += object->shape->Center();
+            const Mesh& mesh = scene.ObjectToMesh(object_id);
+            center += mesh.Center();
         }
         center /= (float)integrator.selected_objects.size();
 
@@ -271,11 +287,10 @@ namespace MyPBRT {
         rotation = rotation_offset;
 
         for (auto& object_index : integrator.selected_objects) {
-            Object* object = &scene.primitives[object_index];
-            object->shape->Translate(center_difference);
-            object->shape->RotateAround(rotation_difference, center_offset);
+            Mesh& mesh = scene.ObjectToMesh(object_index);
+            mesh.Translate(center_difference);
+            mesh.RotateAround(rotation_difference, center_offset);
             scene.RecalculateObject(object_index);
-            std::cout << "recalculated " << object_index << "\n";
         }
 
     }

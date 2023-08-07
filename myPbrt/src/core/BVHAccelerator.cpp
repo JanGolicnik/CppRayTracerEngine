@@ -1,7 +1,7 @@
 #include "BVHAccelerator.h"
 
 #include "Object.h"
-#include "Shape.h"
+#include "Mesh.h"
 #include "Interaction.h"
 
 #include <algorithm>
@@ -149,7 +149,7 @@ namespace MyPBRT {
 		return &flattenedNodes[0];
 	}
 
-	bool BVHAccelerator::Intersect(int nodeIndex, const std::vector<Object>& objects, const Ray& ray, SurfaceInteraction* interaction) const
+	bool BVHAccelerator::Intersect(int nodeIndex, const std::vector<Object>& objects, const Ray& ray, SurfaceInteraction* interaction, const std::vector<std::shared_ptr<Mesh>>& meshes) const
 	{
 		if (nodeIndex >= totalNodes) return false;
 
@@ -159,15 +159,16 @@ namespace MyPBRT {
 		if (node->nPrimitives > 0) {
 			bool hit = false;
 			for (int i = 0; i < node->nPrimitives; i++)
-				if (objects[orderedObjects[node->primitivesOffset + i]].Intersect(ray, interaction)) {
+				if (meshes[objects[orderedObjects[node->primitivesOffset + i]].shape]->Intersect(ray, interaction)) {
 					hit = true;
 					interaction->primitive = orderedObjects[node->primitivesOffset + i];
+					interaction->shape = objects[orderedObjects[node->primitivesOffset + i]].shape;
 				}
 			return hit;
 		}
 
-		bool hit = Intersect(nodeIndex + 1, objects, ray, interaction);
-		hit |= Intersect(node->secondChildOffset, objects, ray, interaction);
+		bool hit = Intersect(nodeIndex + 1, objects, ray, interaction, meshes);
+		hit |= Intersect(node->secondChildOffset, objects, ray, interaction, meshes);
 		
 		return hit;
 	}
@@ -195,7 +196,7 @@ namespace MyPBRT {
 		return hit;
 	}
 
-	bool BVHAccelerator::HasIntersections(int nodeIndex, const std::vector<Object>& objects, const Ray& ray) const {
+	bool BVHAccelerator::HasIntersections(int nodeIndex, const std::vector<Object>& objects, const Ray& ray, const std::vector<std::shared_ptr<Mesh>>& meshes) const {
 		if (nodeIndex >= totalNodes) return false;
 		
 		FlatNode* node = &flattenedNodes[nodeIndex];
@@ -203,18 +204,18 @@ namespace MyPBRT {
 
 		if (node->nPrimitives > 0) {
 			for (int i = 0; i < node->nPrimitives; i++)
-				if (objects[orderedObjects[node->primitivesOffset + i]].hasIntersections(ray))
+				if (meshes[objects[orderedObjects[node->primitivesOffset + i]].shape]->hasIntersections(ray))
 					return true;
 			return false;
 		}
 
-		if (HasIntersections(nodeIndex + 1, objects, ray)) return true;
-		if (HasIntersections(node->secondChildOffset, objects, ray)) return true;
+		if (HasIntersections(nodeIndex + 1, objects, ray, meshes)) return true;
+		if (HasIntersections(node->secondChildOffset, objects, ray, meshes)) return true;
 
 		return false;
 	}
 
-	void BVHAccelerator::RecalculateObject(const std::vector<Object>& objects, int objectIndex)
+	void BVHAccelerator::RecalculateObject(const std::vector<Object>& objects, int objectIndex, const std::vector<std::shared_ptr<Mesh>>& meshes)
 	{
 		int targetNode = obj_to_leaf[objectIndex];
 
@@ -222,7 +223,7 @@ namespace MyPBRT {
 		while (true) {
 			FlatNode* node = &flattenedNodes[currentNode];
 			
-			node->bounds = node->bounds.Union(objects[objectIndex].shape->ObjectBound());
+			node->bounds = node->bounds.Union(meshes[objects[objectIndex].shape]->GetBounds());
 
 			if (node->nPrimitives > 0) return;
 

@@ -47,12 +47,12 @@ namespace MyPBRT {
 
 		FlatNode* GetRoot();
 
-		bool Intersect(int nodeIndex, const std::vector<Object>& objects, const Ray& ray, SurfaceInteraction* interaction) const;
+		bool Intersect(int nodeIndex, const std::vector<Object>& objects, const Ray& ray, SurfaceInteraction* interaction, const std::vector<std::shared_ptr<Mesh>>& meshes) const;
 		bool Intersect(int nodeIndex, const Ray& ray, SurfaceInteraction* interaction, const IntersectionFunction& intersction_func) const;
-		bool HasIntersections(int nodeIndex, const std::vector<Object>& objects, const Ray& ray) const;
+		bool HasIntersections(int nodeIndex, const std::vector<Object>& objects, const Ray& ray, const std::vector<std::shared_ptr<Mesh>>& meshes) const;
 
 		//called when a object inside the leaf moves
-		void RecalculateObject(const std::vector<Object>& objects, int objectIndex);
+		void RecalculateObject(const std::vector<Object>& objects, int objectIndex, const std::vector<std::shared_ptr<Mesh>>& meshes);
 
 	private:
 		const int maxPrimsInNode = 1;

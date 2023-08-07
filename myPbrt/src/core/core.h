@@ -35,7 +35,7 @@ namespace MyPBRT {
 	class Light;
 	struct Object;
 	struct Scene;
-	class Shape;
+	class Mesh;
 	class Texture;
 	class Camera;
 	class Integrator;
@@ -46,6 +46,7 @@ namespace MyPBRT {
 	class CheckerboardTexture;
 	class UVTexture;
 	class ImageTexture;
+	class Pdf;
 
 	using IntegratorSetPixelFunctionPtr = std::function<void(uint32_t, uint32_t, glm::vec4)>;
 
@@ -57,21 +58,31 @@ namespace MyPBRT {
 		return (w << 24) | (b << 16) | (g << 8) | r;
 	}
 
-	inline double random_double(double min = std::numeric_limits<double>::lowest(), double max = std::numeric_limits<double>::max()) {
-		thread_local std::random_device rd;
-		thread_local std::mt19937 gen(rd());
-		thread_local std::uniform_real_distribution<float> dis(min, max);
-		return dis(gen);
+	inline uint32_t pcg_hash(uint32_t input)
+	{
+		uint32_t state = input * 747796405u + 2891336453u;
+		uint32_t word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+		return (word >> 22u) ^ word;
 	}
 
-	inline double random_double_bad() {
-		// Returns a random real in [0,1).
-		return rand() / (RAND_MAX + 1.0);
+	inline uint32_t random_uint() {
+		thread_local uint32_t seed = rand();
+		seed = pcg_hash(seed);
+		return seed;
 	}
 
-	inline double random_double_bad(double min, double max) {
+	inline int random_int(int min, int max) {
+		uint32_t val = random_uint();
+		return (val % (max - min + 1)) + min;
+	}
+
+	inline double random_double() {
+		return (double)random_uint() / (double)std::numeric_limits<uint32_t>::max();
+	}
+
+	inline double random_double(double min, double max) {
 		// Returns a random real in [min,max).
-		return min + (max - min) * random_double_bad();
+		return min + (max - min) * random_double();
 	}
 
 	inline glm::vec3 random_vec3(double min, double max)
@@ -88,18 +99,50 @@ namespace MyPBRT {
 		return vec;
 	}
 
-	inline glm::vec3 random_in_unit_disk() {
-		glm::vec3 p;
+	inline glm::vec3 random_in_unit_hemisphere(const glm::vec3& normal)
+	{
+		glm::vec3 vec = random_in_unit_sphere();
 
+		if (glm::dot(vec, normal) < 0) {
+			return -vec;
+		}
+		return vec;
+	}
+
+	inline glm::vec3 random_in_unit_disk() {
+
+		glm::vec3 p;
 		do{
-			p = glm::vec3(random_double_bad(-1, 1), random_double_bad(-1, 1), 0);
-		
+			p = glm::vec3(random_double(-1, 1), random_double(-1, 1), 0);
 		} while (glm::length2(p) >= 1);
 		
 		return p;
 	}
 
-}
+	inline glm::vec3 random_cosine_direction() {
+		float r1 = random_double();
+		float r2 = random_double();
 
+		float phi = 2 * PI * r1;
+		float x = cos(phi) * sqrt(r2);
+		float y = sin(phi) * sqrt(r2);
+		float z = sqrt(1 - r2);
+
+		return glm::vec3(x, y, z);
+	}
+
+	inline glm::vec3 random_to_sphere(double radius, double distance_squared) {
+		auto r1 = random_double();
+		auto r2 = random_double();
+		auto z = 1 + r2 * (sqrt(1 - radius * radius / distance_squared) - 1);
+
+		auto phi = 2 * PIf * r1;
+		auto x = cos(phi) * sqrt(1 - z * z);
+		auto y = sin(phi) * sqrt(1 - z * z);
+
+		return glm::vec3(x, y, z);
+	}
+
+}
 
 #endif 

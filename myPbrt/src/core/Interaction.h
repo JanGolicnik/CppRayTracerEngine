@@ -24,13 +24,11 @@ namespace MyPBRT {
 	class SurfaceInteraction : public Interaction {
 	public:
 		glm::vec2 uv = glm::vec2(0.0f);
-		const Shape* shape = nullptr;
+		int shape;
 		int primitive = -1;
 		bool front_face = true;
 
 	public:
-		SurfaceInteraction() {}
-		SurfaceInteraction(const glm::vec3& p, const glm::vec3& normal, const glm::vec2& uv, const glm::vec3& wo, const Shape* shape);
 		void SetNormal(const glm::vec3& _rayDirection, const glm::vec3& _normal) {
 			front_face = glm::dot(_rayDirection, normal) < 0;
 			normal = front_face ? _normal : -_normal;

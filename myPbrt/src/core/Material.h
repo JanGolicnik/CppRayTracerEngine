@@ -7,11 +7,14 @@
 namespace MyPBRT{
 
     class Material {
-
     public:
-        virtual glm::vec3 Evaluate(SurfaceInteraction* interaction, const glm::vec3& wo, const glm::vec3& wi, glm::vec3* light) const = 0;
-        virtual bool ScatterRay(const SurfaceInteraction& interaction, Ray* ray) const = 0;
+        bool has_pdf = false;
+    public:
+        virtual glm::vec3 Evaluate(SurfaceInteraction* interaction) const = 0;
+        virtual glm::vec3 EvaluateLight(const SurfaceInteraction& interaction) const { return glm::vec3(0.0f); };
+        virtual bool ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const = 0;
         virtual void IMGUI_Edit() = 0;
+        virtual float Pdf_Value(const glm::vec3& incoming, const glm::vec3& normal) const = 0;
     };
 
     class EmissiveMaterial : public Material {
@@ -20,11 +23,13 @@ namespace MyPBRT{
         std::shared_ptr<Texture> texture;
 
     public:
-        EmissiveMaterial(std::shared_ptr<Texture> _texture, glm::vec3 _emission = glm::vec3(0.0f)) :texture(_texture), emission(_emission) {}
-        glm::vec3 Evaluate(SurfaceInteraction* interaction, const glm::vec3& wo, const glm::vec3& wi, glm::vec3* light) const;
-        bool ScatterRay(const SurfaceInteraction& interaction, Ray* ray) const;
+        EmissiveMaterial(std::shared_ptr<Texture> _texture, glm::vec3 _emission = glm::vec3(0.0f)) :texture(_texture), emission(_emission) { }
+        glm::vec3 EvaluateLight(const SurfaceInteraction& interaction) const;
+        glm::vec3 Evaluate(SurfaceInteraction* interaction) const;
+        bool ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const;
         void IMGUI_Edit();
         static void IMGUI_Create(Scene* scene);
+        float Pdf_Value(const glm::vec3& incoming, const glm::vec3& normal) const { return 0; }
 
     private:
         static const std::vector<Texture::TextureType> selectable_texture_types;
@@ -37,11 +42,12 @@ namespace MyPBRT{
         std::shared_ptr<Texture> texture;
 
     public:
-        DiffuseMaterial(std::shared_ptr<Texture> _texture, float _smoothness = 0.0f) :texture(_texture), smoothness(_smoothness) {}
-        glm::vec3 Evaluate(SurfaceInteraction* interaction, const glm::vec3& wo, const glm::vec3& wi, glm::vec3* light) const;
-        bool ScatterRay(const SurfaceInteraction& interaction, Ray* ray) const;
+        DiffuseMaterial(std::shared_ptr<Texture> _texture, float _smoothness = 0.0f) :texture(_texture), smoothness(_smoothness) { has_pdf = true; }
+        glm::vec3 Evaluate(SurfaceInteraction* interaction) const;
+        bool ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const;
         void IMGUI_Edit();
         static void IMGUI_Create(Scene* scene);
+        float Pdf_Value(const glm::vec3& incoming, const glm::vec3& normal) const;
 
     private:
         static const std::vector<Texture::TextureType> selectable_texture_types;
@@ -55,10 +61,11 @@ namespace MyPBRT{
 
     public:
         MetallicMaterial(std::shared_ptr<Texture> _texture, float _roughness = 0.0f) :texture(_texture), roughness(_roughness) {}
-        glm::vec3 Evaluate(SurfaceInteraction* interaction, const glm::vec3& wo, const glm::vec3& wi, glm::vec3* light) const;
-        bool ScatterRay(const SurfaceInteraction& interaction, Ray* ray) const;
+        glm::vec3 Evaluate(SurfaceInteraction* interaction) const;
+        bool ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const;
         void IMGUI_Edit();
         static void IMGUI_Create(Scene* scene);
+        float Pdf_Value(const glm::vec3& incoming, const glm::vec3& normal) const { return 0; }
 
     private:
         static const  std::vector<Texture::TextureType> selectable_texture_types;
@@ -73,10 +80,11 @@ namespace MyPBRT{
 
     public:
         GlassMaterial(std::shared_ptr<Texture> _roughness_map, float _ior = 1.0f) : roughness_map(_roughness_map), ior(_ior) {}
-        glm::vec3 Evaluate(SurfaceInteraction* interaction, const glm::vec3& wo, const glm::vec3& wi, glm::vec3* light) const;
-        bool ScatterRay(const SurfaceInteraction& interaction, Ray* ray) const;
+        glm::vec3 Evaluate(SurfaceInteraction* interaction) const;
+        bool ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const;
         void IMGUI_Edit();
         static void IMGUI_Create(Scene* scene);
+        float Pdf_Value(const glm::vec3& incoming, const glm::vec3& normal) const { return 0; }
 
     private:
         static const std::vector<Texture::TextureType> selectable_roughness_map_types;

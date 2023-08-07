@@ -1,4 +1,4 @@
-#include "Shape.h"
+#include "Mesh.h"
 
 #include "Interaction.h"
 #include "Camera.h"
@@ -9,120 +9,145 @@
 
 namespace MyPBRT {
 
-    Shape::~Shape() {  }
-
-    void Sphere::Preprocess() { }
-
-    bool Sphere::Intersect(const Ray& r, SurfaceInteraction* interaction, bool testAlphaTexture) const
+    float TriangleArea(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2)
     {
-        glm::vec3 origin = r.o - position;
-
-        double a = glm::dot(r.d, r.d);
-        double b = 2.0f * glm::dot(origin, r.d);
-        double c = glm::dot(origin, origin) - radius * radius;
-
-        double discriminant = b * b - 4.0 * a * c;
-        if (discriminant < 0.0f)
-            return false;
-
-        double closestT = (-b - glm::sqrt(discriminant)) / (2.0 * a);
-        if (closestT < 0.0001 || closestT > r.tMax) 
-            return false;
-        r.tMax = closestT;
-
-        interaction->pos = origin + r.d * r.tMax;
-        interaction->normal = glm::normalize(interaction->pos);
-        float theta = acos(-interaction->normal.y);
-        float phi = atan2(-interaction->normal.z, -interaction->normal.x) + PIf;
-        float u = phi * .5f * INVPIf;
-        float v = theta * INVPIf;
-        interaction->uv = glm::vec2(u, v);
-
-        if (radius < 0)
-            interaction->normal = -interaction->normal;
-        interaction->pos += position;
-        interaction->front_face = glm::dot(r.d, interaction->normal) < 0.0f;
-
-        return true;
+        //half of |AB x AC|
+        float area = 0.5f * glm::length(glm::cross(p1 - p0, p2 - p0));
+        return area;
     }
 
-    bool Sphere::hasIntersections(const Ray& r, bool testAlphaTexture) const
-    {
-        glm::vec3 origin = r.o - position;
+    /*
+    //bool Sphere::Intersect(const Ray& r, SurfaceInteraction* interaction, bool testAlphaTexture) const
+    //{
+    //    glm::vec3 origin = r.o - position;
 
-        float a = glm::dot(r.d, r.d);
-        float b = 2.0f * glm::dot(origin, r.d);
-        float c = glm::dot(origin, origin) - radius * radius;
+    //    double a = glm::dot(r.d, r.d);
+    //    double b = 2.0f * glm::dot(origin, r.d);
+    //    double c = glm::dot(origin, origin) - radius * radius;
 
-        float discriminant = b * b - 4.0f * a * c;
-        if (discriminant < 0.0f)
-            return false;
+    //    double discriminant = b * b - 4.0 * a * c;
+    //    if (discriminant < 0.0f)
+    //        return false;
 
-        float closestT = (-b - glm::sqrt(discriminant)) / (2.0f * a);
-        if (closestT < 0 || closestT > r.tMax)
-            return false;
+    //    double closestT = (-b - glm::sqrt(discriminant)) / (2.0 * a);
+    //    if (closestT < 0.0001 || closestT > r.tMax) 
+    //        return false;
+    //    r.tMax = closestT;
 
-        return true;
-    }
+    //    interaction->pos = origin + r.d * r.tMax;
+    //    interaction->normal = glm::normalize(interaction->pos);
+    //    float theta = acos(-interaction->normal.y);
+    //    float phi = atan2(-interaction->normal.z, -interaction->normal.x) + PIf;
+    //    float u = phi * .5f * INVPIf;
+    //    float v = theta * INVPIf;
+    //    interaction->uv = glm::vec2(u, v);
 
-    float Sphere::Area() const
-    {
-        return 2 * PI * radius;
-    }
+    //    if (radius < 0)
+    //        interaction->normal = -interaction->normal;
+    //    interaction->pos += position;
+    //    interaction->front_face = glm::dot(r.d, interaction->normal) < 0.0f;
 
-    bool Sphere::CreateIMGUI(const std::vector<std::shared_ptr<Material>>& materials)
-    {
-        bool changed = false;
-        changed |= ImGui::DragFloat3("position", glm::value_ptr(position), .01, -10000, 10000);
-        changed |= ImGui::DragFloat("radius", &radius, .01, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max());
-        if (changed)
-            bounds = Bounds(position - radius, position + radius);
-        return changed;
-    }
+    //    return true;
+    //}
 
-    void Sphere::DrawLines(const glm::vec2& resolution, const Camera& camera, const glm::vec3& color, IntegratorSetPixelFunctionPtr set_function) const
-    {
-        glm::vec4 pos = camera.GetView() * glm::vec4(position,1);
-        pos = camera.GetProjection() * pos;
-        float w = pos.w;
-        if (w == 0) return;
-        pos /= w;
-        pos += 1;
-        pos *= 0.5;
-        if (pos.z > 1) return;
-        if (pos.x < 0 || pos.x > 1) return;
-        if (pos.y < 0 || pos.y > 1) return;
+    //bool Sphere::hasIntersections(const Ray& r, bool testAlphaTexture) const
+    //{
+    //    glm::vec3 origin = r.o - position;
 
-        glm::ivec2 screenPosition = glm::ivec2(pos.x * resolution.x, pos.y * resolution.y);
-        float screenRadius = (radius * resolution.y) / w;
-        screenRadius *= 1.1;
-        set_function(screenPosition.x, screenPosition.y, glm::vec4(color, 0.0f));
+    //    float a = glm::dot(r.d, r.d);
+    //    float b = 2.0f * glm::dot(origin, r.d);
+    //    float c = glm::dot(origin, origin) - radius * radius;
 
-        float circumference = 2 * PIf * screenRadius;
-        float ratio = (2*PIf) / circumference;
+    //    float discriminant = b * b - 4.0f * a * c;
+    //    if (discriminant < 0.0f)
+    //        return false;
 
-        for (int i = 0; i <= circumference; i++) {
-            glm::ivec2 pos = screenPosition + 1;
-            pos.x += cos(i * ratio) * screenRadius;
-            pos.y += sin(i * ratio) * screenRadius;
-            if (pos.x > 0 && pos.x < resolution.x && pos.y > 0 && pos.y < resolution.y)
-                set_function(pos.x, pos.y, glm::vec4(color, 0.0f));
-        }
+    //    float closestT = (-b - glm::sqrt(discriminant)) / (2.0f * a);
+    //    if (closestT < 0 || closestT > r.tMax)
+    //        return false;
 
+    //    return true;
+    //}
 
-    }
-    void Sphere::Translate(const glm::vec3& vec)
-    {
-        position += vec;
-        bounds.Translate(vec);
-    }
-    void Sphere::RotateAround(const glm::quat& rotation, const glm::vec3& pivot)
-    {
-        glm::vec3 prevpos = position;
-        position = pivot + rotation * (position - pivot);
-        bounds.Translate(position - prevpos);
-    }
-    TriangleMesh::TriangleMesh(const std::vector<Vertex>& _vertices, const std::vector<uint32_t>& _indices)
+    //float Sphere::Area() const
+    //{
+    //    return 2 * PI * radius;
+    //}
+
+    //bool Sphere::CreateIMGUI(const std::vector<std::shared_ptr<Material>>& materials)
+    //{
+    //    bool changed = false;
+    //    changed |= ImGui::DragFloat3("position", glm::value_ptr(position), .01, -10000, 10000);
+    //    changed |= ImGui::DragFloat("radius", &radius, .01, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max());
+    //    if (changed)
+    //        bounds = Bounds(position - radius, position + radius);
+    //    return changed;
+    //}
+
+    //void Sphere::DrawLines(const glm::vec2& resolution, const Camera& camera, const glm::vec3& color, IntegratorSetPixelFunctionPtr set_function) const
+    //{
+    //    glm::vec4 pos = camera.GetView() * glm::vec4(position,1);
+    //    pos = camera.GetProjection() * pos;
+    //    float w = pos.w;
+    //    if (w == 0) return;
+    //    pos /= w;
+    //    pos += 1;
+    //    pos *= 0.5;
+    //    if (pos.z > 1) return;
+    //    if (pos.x < 0 || pos.x > 1) return;
+    //    if (pos.y < 0 || pos.y > 1) return;
+
+    //    glm::ivec2 screenPosition = glm::ivec2(pos.x * resolution.x, pos.y * resolution.y);
+    //    float screenRadius = (radius * resolution.y) / w;
+    //    screenRadius *= 1.1;
+    //    set_function(screenPosition.x, screenPosition.y, glm::vec4(color, 0.0f));
+
+    //    float circumference = 2 * PIf * screenRadius;
+    //    float ratio = (2*PIf) / circumference;
+
+    //    for (int i = 0; i <= circumference; i++) {
+    //        glm::ivec2 pos = screenPosition + 1;
+    //        pos.x += cos(i * ratio) * screenRadius;
+    //        pos.y += sin(i * ratio) * screenRadius;
+    //        if (pos.x > 0 && pos.x < resolution.x && pos.y > 0 && pos.y < resolution.y)
+    //            set_function(pos.x, pos.y, glm::vec4(color, 0.0f));
+    //    }
+    //}
+    //void Sphere::Translate(const glm::vec3& vec)
+    //{
+    //    position += vec;
+    //    bounds.Translate(vec);
+    //}
+    //void Sphere::RotateAround(const glm::quat& rotation, const glm::vec3& pivot)
+    //{
+    //    glm::vec3 prevpos = position;
+    //    position = pivot + rotation * (position - pivot);
+    //    bounds.Translate(position - prevpos);
+    //}
+    //glm::vec3 Sphere::Sample(const SurfaceInteraction& interaction) const
+    //{
+    //    glm::vec3 dir = position - interaction.pos;
+    //    auto distance_squared = glm::length2(dir);
+
+    //    glm::vec3 unit_w = glm::normalize(dir);
+    //    glm::vec3 a = (fabs(unit_w.x) > 0.9) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+    //    glm::vec3 v = glm::normalize(glm::cross(unit_w, a));
+    //    glm::vec3 u = glm::cross(unit_w, v);
+
+    //    glm::vec3 random = random_to_sphere(radius, distance_squared);
+
+    //    return random.x * u + random.y * v + random.z * unit_w;
+    //}
+    //float Sphere::PDF_Value(const SurfaceInteraction& interacton, const glm::vec3& direction) const
+    //{
+    //    glm::vec3 dir = position - interacton.pos;
+    //    auto cos_theta_max = sqrt(1.0f - radius * radius / glm::length2(dir));
+    //    auto solid_angle = 2 * PIf * (1 - cos_theta_max);
+
+    //    return  1 / solid_angle;
+    //}
+   */
+    Mesh::Mesh(const std::vector<Vertex>& _vertices, const std::vector<uint32_t>& _indices)
         : vertices(_vertices), indices(_indices) {
         std::unordered_map<int, int> edgesMap;
         for (int i = 0; i < indices.size(); i += 3) {
@@ -135,14 +160,14 @@ namespace MyPBRT {
         }
         ApplyTransformation();
     }
-    void TriangleMesh::Preprocess()
+    void Mesh::Preprocess()
     {
     }
-    bool TriangleMesh::Intersect(const Ray& ray, SurfaceInteraction* interaction, bool testAlphaTexture) const
+    bool Mesh::Intersect(const Ray& ray, SurfaceInteraction* interaction, bool testAlphaTexture) const
     {
         return accel.Intersect(0, ray, interaction, triangle_intersection_func);
     }
-    bool TriangleMesh::hasIntersections(const Ray& ray, bool testAlphaTexture) const
+    bool Mesh::hasIntersections(const Ray& ray, bool testAlphaTexture) const
     {
         bool hit = false;
 
@@ -210,11 +235,11 @@ namespace MyPBRT {
 
         return false;
     }
-    float TriangleMesh::Area() const
+    float Mesh::Area() const
     {
         return 0.0f;
     }
-    bool TriangleMesh::CreateIMGUI(const std::vector<std::shared_ptr<Material>>& materials)
+    bool Mesh::CreateIMGUI()
     {
         bool changed = false;
 
@@ -234,7 +259,7 @@ namespace MyPBRT {
         }
         return changed;
     }
-    void TriangleMesh::DrawLines(const glm::vec2& resolution, const Camera& camera, const glm::vec3& color, IntegratorSetPixelFunctionPtr set_function) const
+    void Mesh::DrawLines(const glm::vec2& resolution, const Camera& camera, const glm::vec3& color, IntegratorSetPixelFunctionPtr set_function) const
     {
         for (auto& edge : edges) {
             glm::vec4 pos1 = camera.GetView() * glm::vec4(transformed_vertices[edge.first].position, 1);
@@ -273,18 +298,18 @@ namespace MyPBRT {
             }
         }
     }
-    void TriangleMesh::Translate(const glm::vec3& vec)
+    void Mesh::Translate(const glm::vec3& vec)
     { 
         position += vec;
         ApplyTransformation();
     }
-    void TriangleMesh::RotateAround(const glm::quat& rotation_offset, const glm::vec3& pivot)
+    void Mesh::RotateAround(const glm::quat& rotation_offset, const glm::vec3& pivot)
     {
         position = pivot + rotation_offset * (position - pivot);
         rotation = rotation_offset * rotation;
         ApplyTransformation();
     }
-    bool TriangleMesh::IntersectTriangle(const Ray& ray, SurfaceInteraction* interaction, int object) const
+    bool Mesh::IntersectTriangle(const Ray& ray, SurfaceInteraction* interaction, int object) const
     {
         object *= 3;
         const uint32_t i0 = indices[object], i1 = indices[object + 1], i2 = indices[object + 2];
@@ -365,8 +390,7 @@ namespace MyPBRT {
 
         return true;
     }
-
-    std::vector < std::vector<std::pair<Integrator::RasterPixel, Integrator::RasterPixel>>> TriangleMesh::GetRasterizedEdges(const Camera& camera) const
+    std::vector < std::vector<std::pair<Integrator::RasterPixel, Integrator::RasterPixel>>> Mesh::GetRasterizedEdges(const Camera& camera) const
     {
         std::vector < std::vector<std::pair<Integrator::RasterPixel, Integrator::RasterPixel>>> transformed_edges;
 
@@ -374,7 +398,6 @@ namespace MyPBRT {
             const Vertex& v1 = transformed_vertices[indices[i]],
                 &v2 = transformed_vertices[indices[i + 1]],
                 &v3 = transformed_vertices[indices[i + 2]];
-
 
             Integrator::RasterPixel rp1, rp2, rp3;
 
@@ -402,43 +425,12 @@ namespace MyPBRT {
             transformed_edges.push_back({ {rp1, rp2}, {rp1, rp3}, {rp2, rp3 } });
         }
 
-        //for (auto& edge : edges) {
-        //    const Vertex& v1 = transformed_vertices[edge.first];
-        //    glm::vec4 pos1(v1.position, 1);
-        //    pos1 = camera.GetView() * pos1;
-        //    pos1 = camera.GetProjection() * pos1;
-        //    float inverseW1 = 1.0f / pos1.w;
-        //    pos1 *= inverseW1;
-        //    pos1 += 1;
-        //    pos1 *= .5f;
-
-        //    const Vertex& v2 = transformed_vertices[edge.second];
-        //    glm::vec4 pos2(v2.position, 1);
-        //    pos2 = camera.GetView() * pos2;
-        //    pos2 = camera.GetProjection() * pos2;
-        //    float inverseW2 = 1.0f / pos2.w;
-        //    pos2 *= inverseW2;
-        //    pos2 += 1;
-        //    pos2 *= .5f;
-        //    Integrator::RasterPixel p1;
-        //    p1.normalized_position = pos1;
-        //    p1.uv = v1.uv;
-        //    p1.normal = v1.normal;
-        //    p1.depth = glm::distance2(camera.GetPosition(), v1.position);
-        //    Integrator::RasterPixel p2;
-        //    p2.normalized_position = pos2;
-        //    p2.uv = v2.uv;
-        //    p2.normal = v2.normal;
-        //    p2.depth = glm::distance2(camera.GetPosition(), v2.position);
-        //    
-        //    transformed_edges.push_back({ p1, p2 });
-        //}
-
         return transformed_edges;
     }
 
-    void TriangleMesh::ApplyTransformation()
+    void Mesh::ApplyTransformation()
     {
+        triangle_areas.reserve(ceil(indices.size()/3));
         transformed_vertices.resize(vertices.size());
         glm::vec3 min(std::numeric_limits<float>::max()), max(std::numeric_limits<float>::lowest());
         
@@ -491,10 +483,15 @@ namespace MyPBRT {
             bt0 = glm::normalize(bt0);
             bt1 = glm::normalize(bt1);
             bt2 = glm::normalize(bt2);
+
+            float area = TriangleArea(p0, p1, p2);
+            total_area += area;
+            triangle_areas.push_back(area);
         }
+
         accel.Build(all_bounds);
     }
-    void TriangleMesh::Vertex::CreateIMGUI(const std::string& name)
+    void Mesh::Vertex::CreateIMGUI(const std::string& name)
     {
         ImGui::DragFloat3(name.c_str(), glm::value_ptr(position), 0.01, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max());
     }

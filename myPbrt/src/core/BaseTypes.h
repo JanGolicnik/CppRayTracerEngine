@@ -170,28 +170,7 @@ inline void CoordinateSystem(const glm::vec3& v1, glm::vec3* v2,
 }
 
 
-inline uint32_t pcg_hash(uint32_t input)
-{
-    uint32_t state = input * 747796405u + 2891336453u;
-    uint32_t word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    return (word >> 22u) ^ word;
-}
 
-inline float RandomFloat(uint32_t* seed) {
-    *seed = pcg_hash(*seed);
-    return (float)*seed / std::numeric_limits<uint32_t>::max();
-}
-
-inline glm::vec3 RandomInHemisphere(uint32_t* seed) {
-    return glm::vec3(RandomFloat(seed) * 2.0f - 1.0f,
-        RandomFloat(seed) * 2.0f - 1.0f,
-        RandomFloat(seed) * 2.0f - 1.0f);
-}
-inline glm::vec3 RandomInHemisphere(uint32_t seed) {
-    return glm::vec3(RandomFloat(&seed) * 2.0f - 1.0f,
-        RandomFloat(&seed) * 2.0f - 1.0f,
-        RandomFloat(&seed) * 2.0f - 1.0f);
-}
 
 inline glm::vec3 Reflect(const glm::vec3& wo, const glm::vec3& n) {
     return -wo + 2 * glm::dot(wo, n) * n;
