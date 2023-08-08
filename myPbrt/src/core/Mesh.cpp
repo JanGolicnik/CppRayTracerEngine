@@ -315,11 +315,6 @@ namespace MyPBRT {
         const uint32_t i0 = indices[object], i1 = indices[object + 1], i2 = indices[object + 2];
         const Vertex* v0 = &transformed_vertices[i0], * v1 = &transformed_vertices[i1], * v2 = &transformed_vertices[i2];
 
-        // > because ray.d in incoming not outgoing
-        if (glm::dot(v0->normal, ray.d) > 0 && glm::dot(v1->normal, ray.d) > 0 && glm::dot(v2->normal, ray.d) > 0) {
-            return false;
-        }
-
         //t - translated
         glm::vec3 p0t = v0->position - ray.o;
         glm::vec3 p1t = v1->position - ray.o;
@@ -362,7 +357,6 @@ namespace MyPBRT {
         p1t.z *= shearedZ;
         p2t.z *= shearedZ;
 
-        //avoid floating point division
         float tScaled = e0 * p0t.z + e1 * p1t.z + e2 * p2t.z;
         if (det < 0 && (tScaled >= 0 || tScaled < ray.tMax * det))
             return false;
@@ -377,8 +371,10 @@ namespace MyPBRT {
 
         glm::vec3 hitPos = b0 * v0->position + b1 * v1->position + b2 * v2->position;
         interaction->normal = b0 * v0->normal + b1 * v1->normal + b2 * v2->normal;
+
         interaction->uv = b0 * v0->uv + b1 * v1->uv + b2 * v2->uv;
         interaction->pos = hitPos;
+        interaction->front_face = glm::dot(ray.d, interaction->normal) < 0;
         ray.tMax = t;
 
         if (normal_map) {

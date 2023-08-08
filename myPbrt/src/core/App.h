@@ -23,7 +23,7 @@ namespace MyPBRT {
 	public:
 		App();
 		~App();
-		void RenderFrame(double dt, glm::ivec2 resolution);
+		void Update(double dt, glm::ivec2 resolution);
 		uint32_t* GetImage();
 		
 		void MousePressed(int button);

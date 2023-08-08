@@ -25,7 +25,7 @@ namespace MyPBRT {
 
     App::~App() {}
 
-    void App::RenderFrame(double dt, glm::ivec2 resolution)
+    void App::Update(double dt, glm::ivec2 resolution)
     {
         afk_timer += dt;
         if (afk_timer > 1.5) {
@@ -59,7 +59,6 @@ namespace MyPBRT {
                 SurfaceInteraction interaction;
                 Ray ray = camera.GetMouseRay(normalized_mouse_position);
                 scene.IntersectAccel(ray, &interaction);
-                std::cout << interaction.uv.x << " " << interaction.uv.y << "\n";
                 if(!holding_shift)
                     integrator.selected_objects.clear();
                 if (interaction.primitive >= 0 && interaction.primitive < scene.objects.size())
@@ -83,9 +82,6 @@ namespace MyPBRT {
         camera.ButtonCallback(key, true);
         if (key == 340) {
             holding_shift = true;
-        }
-        if (key == 84) {
-            scene.Build();
         }
     }
 
@@ -115,12 +111,11 @@ namespace MyPBRT {
         IMGUIMaterials();
         IMGUIRendering();
         IMGUISelection();
-
 	}
+
     void App::IMGUISettings()
     {
         ImGui::Begin("Settings");
-
 
         bool changed = ImGui::DragFloat("focal distance", &camera.GetFocalDistance(), 0.01, 0, std::numeric_limits<float>::max());
         changed |= ImGui::DragFloat("lens radius", &camera.GetLensRadius(), 0.01, 0, std::numeric_limits<float>::max());
@@ -223,6 +218,7 @@ namespace MyPBRT {
     void App::IMGUIRendering()
     {
         ImGui::Begin("Rendering");
+
         integrator.CreateIMGUI();
         ImGui::End();
     }

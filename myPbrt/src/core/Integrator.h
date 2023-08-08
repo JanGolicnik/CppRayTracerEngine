@@ -78,6 +78,9 @@ namespace MyPBRT {
 		glm::ivec2 render_resolution;
 		glm::ivec2 image_resolution;
 		uint32_t frame = 0;
+		int samples = 100;
+
+		bool draw_overlays = true;
 
 		//w channel for depth
 		glm::vec4* image;
@@ -91,7 +94,6 @@ namespace MyPBRT {
 		std::shared_ptr<Texture> world_texture;
 		std::vector<Texture::TextureType> world_texture_types = { Texture::TextureType::ConstantColor, Texture::TextureType::Image };
 		int selected_world_texture = 0;
-
 
 	private:
 		void DrawOverlays();

@@ -22,37 +22,39 @@ namespace MyPBRT {
 		return glm::vec3(1, 0, 1);
 	}
 
-	bool DiffuseMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const
+	bool DiffuseMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir, bool& has_pdf) const
 	{
-		glm::vec3 scattered = random_cosine_direction();
-		//glm::vec3 scattered = random_in_unit_hemisphere(interaction.normal);
-		glm::vec3 reflected = glm::reflect(glm::normalize(dir), interaction.normal);
-		dir = (1.0f - smoothness) * scattered + smoothness * reflected;
+		if (random_double(0, 1) < roughness) {
+			has_pdf = true;
+			dir = random_cosine_direction();
+		}
+		else {
+			dir = glm::reflect(glm::normalize(dir), interaction.normal);
+		}
 
-
-		dir = random_cosine_direction();
 		if (glm::dot(dir, interaction.normal) < 0) {
 			dir = -dir;
 		}
+
 		return true;
 	}
 
 	void DiffuseMaterial::IMGUI_Edit()
 	{
-		ImGui::DragFloat("smoothness", &smoothness, .1, 0, 1);
+		ImGui::DragFloat("roguhness", &roughness, .1, 0, 1);
 		Texture::CreateTextureFromMenuFull(&selected_texture, &texture, selectable_texture_types);
 	}
 
 	void DiffuseMaterial::IMGUI_Create(Scene* scene)
 	{
-		static float smoothness = 0.0f;
-		ImGui::DragFloat("smoothness", &smoothness, 0.01f, 0, 1);
+		static float local_roughness = 0.0f;
+		ImGui::DragFloat("roughness", &local_roughness, 0.01f, 0, 1);
 		Texture::CreationMenuImGUI(&selected_texture, selectable_texture_types);
 		if (ImGui::Button("Add")) {
-			smoothness = 0.0f;
+			local_roughness = 0.0f;
 			std::shared_ptr<Texture> tex = Texture::CreateTexture();
 			if (tex.get() != nullptr) {
-				std::shared_ptr<Material> mat(new DiffuseMaterial(tex, smoothness));
+				std::shared_ptr<Material> mat(new DiffuseMaterial(tex, local_roughness));
 				scene->materials.push_back(mat);
 			}
 		}
@@ -61,7 +63,6 @@ namespace MyPBRT {
 	{
 		float cosine_theta = glm::dot(glm::normalize(direction), normal);
 		return fmax(0, cosine_theta * INVPIf);
-	//	return glm::dot(incoming, normal) * INVPIf;
 	}
 	glm::vec3 EmissiveMaterial::EvaluateLight(const SurfaceInteraction& interaction) const
 	{
@@ -76,7 +77,7 @@ namespace MyPBRT {
 		return glm::vec3(1.0f);
 	}
 
-	bool EmissiveMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const
+	bool EmissiveMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir, bool& has_pdf) const
 	{
 		return false;
 	}
@@ -102,6 +103,11 @@ namespace MyPBRT {
 		}
 	}
 
+	float EmissiveMaterial::Pdf_Value(const glm::vec3& incoming, const glm::vec3& normal) const
+	{
+		return 0.0f;
+	}
+
 	glm::vec3 MetallicMaterial::Evaluate(SurfaceInteraction* interaction) const
 	{
 		if (texture) {
@@ -110,11 +116,18 @@ namespace MyPBRT {
 		return glm::vec3(1, 0, 1);
 	}
 
-	bool MetallicMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const
+	bool MetallicMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir, bool& has_pdf) const
 	{
-		glm::vec3 scattered = roughness * random_in_unit_sphere();
-		glm::vec3 reflected = glm::reflect(glm::normalize(dir), interaction.normal);
-		dir = glm::normalize(scattered + reflected);
+		dir = glm::reflect(glm::normalize(dir), interaction.normal);
+		if (random_double(0, 1) < roughness) {
+			has_pdf = true;
+			dir = glm::normalize(random_cosine_direction() + dir);
+		}
+
+		if (glm::dot(dir, interaction.normal) < 0) {
+			dir = -dir;
+		}
+
 		return true;
 	}
 
@@ -137,6 +150,12 @@ namespace MyPBRT {
 				scene->materials.push_back(mat);
 			}
 		}
+	}
+
+	float MetallicMaterial::Pdf_Value(const glm::vec3& direction, const glm::vec3& normal) const
+	{
+		float cosine_theta = glm::dot(glm::normalize(direction), normal);
+		return fmax(0, cosine_theta * INVPIf);
 	}
 
 	glm::vec3 GlassMaterial::Evaluate(SurfaceInteraction* interaction) const
@@ -167,25 +186,24 @@ namespace MyPBRT {
 		return Fresnel;
 	}
 
-	bool GlassMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir) const
+	bool GlassMaterial::ScatterRay(const SurfaceInteraction& interaction, glm::vec3& dir, bool& has_pdf) const
 	{
-		glm::vec3 normal = interaction.normal;
 		glm::vec3 unit_direction = glm::normalize(dir);
-		float refraction_ratio = glm::dot(unit_direction, normal) < 0 ? (1.0 / ior) : ior;
-
-		double cos_theta = glm::abs(glm::dot(-unit_direction, normal));
+		float refraction_ratio = glm::dot(unit_direction, interaction.normal) < 0 ? (1.0 / ior) : ior;
+		double cos_theta = glm::abs(glm::dot(-unit_direction, interaction.normal));
 		double reflectance = schlick_reflectance(cos_theta, refraction_ratio);
 
-		float roughness = roughness_map->Evaluate(interaction).x;
-
-		glm::vec3 scattered = roughness * random_in_unit_sphere();
-		normal = glm::normalize(normal + scattered);
-		double rand = random_double();
-
-		if (reflectance > rand)
-			dir = glm::reflect(unit_direction, normal);
+		if (reflectance > random_double())
+			dir = glm::reflect(unit_direction, interaction.normal);
 		else
-			dir = glm::refract(unit_direction, normal, refraction_ratio);
+			dir = glm::refract(unit_direction, interaction.normal, refraction_ratio);
+		dir = glm::refract(unit_direction, interaction.normal, refraction_ratio);
+
+		float roughness = roughness_map->Evaluate(interaction).x;
+		if (random_double(0, 1) < roughness) {
+			has_pdf = true;
+			dir = glm::normalize(random_cosine_direction() + dir);
+		}
 
 		return true;
 	}
@@ -209,6 +227,12 @@ namespace MyPBRT {
 				scene->materials.push_back(mat);
 			}
 		}
+	}
+
+	float GlassMaterial::Pdf_Value(const glm::vec3& direction, const glm::vec3& normal) const
+	{
+		float cosine_theta = glm::abs(glm::dot(glm::normalize(direction), normal));
+		return cosine_theta * INVPIf;
 	}
 
 }

@@ -63,7 +63,7 @@ namespace MyPBRT {
 				image[x + y * render_resolution.x] += glm::vec4(light, 0);
 
 				});
-	});
+		});
 
 #else
 		std::for_each(height_iterator.begin(), height_iterator.end(), [this](uint32_t y) {
@@ -108,15 +108,22 @@ namespace MyPBRT {
 				break;
 			}
 
+			if (interaction.front_face == false) {
+				interaction.normal = -interaction.normal;
+			}
 
-			glm::vec3 wo = glm::normalize(-ray->d);
 			const std::shared_ptr<Material>& material = active_scene->materials[active_scene->objects[interaction.primitive].material];
 			
 			color += material->EvaluateLight(interaction);
 			glm::vec3 materialColor = material->Evaluate(&interaction);
 
-			if (material->has_pdf) {
+			bool has_pdf = false;
+			if (!material->ScatterRay(interaction, ray->d, has_pdf)) {
+				break;
+			}
 
+			if (has_pdf) {
+				glm::vec3 d = ray->d;
 				if (active_scene->lights.size() > 0)
 				{
 					int index = random_int(0, active_scene->lights.size() - 1);
@@ -124,29 +131,23 @@ namespace MyPBRT {
 					glm::vec3 point_on_light = light->Sample(interaction);
 					ray->d = point_on_light - interaction.pos;
 
-					if (glm::dot(interaction.normal, ray->d) < 0) goto scatterMaterial;
+					if (glm::dot(interaction.normal, ray->d) < 0) goto material;
 					ray->tMax = glm::distance(point_on_light, interaction.pos);
-					if (active_scene->hasIntersectionsAccel(*ray)) goto scatterMaterial;
+					if (active_scene->hasIntersectionsAccel(*ray)) goto material;
 
 					float light_pdf = light->PDF_Value(interaction, ray->d);
 					color += light->Color() / light_pdf;
 				}
-				scatterMaterial:
-				material->ScatterRay(interaction, ray->d);
-			
+			material:
+				ray->d = d;
 				float pdf = material->Pdf_Value(ray->d, interaction.normal);
 				contribution *= materialColor / pdf;
-
 			}
 			else {
-				if (!material->ScatterRay(interaction, ray->d)) {
-					break;
-				}
-
 				contribution *= materialColor;
 			}
 
-			ray->o = interaction.pos;
+			ray->o = interaction.pos + ray->d * 0.0001f;
 			ray->tMax = std::numeric_limits<float>::max();
 		}
 
@@ -338,7 +339,8 @@ namespace MyPBRT {
 				output_image[x + y * render_resolution.x] = ToUint(glm::vec4(glm::vec3(pixel.r, pixel.g, pixel.b) * inverse_frame, 1.0f));
 			}
 		}
-		DrawOverlays();
+		if (draw_overlays)
+			DrawOverlays();
 		return output_image;
 	}
 
@@ -362,9 +364,12 @@ namespace MyPBRT {
 	{
 		auto prevType = rendering_type;
 		
-		if (ImGui::DragFloat2("scale", glm::value_ptr(image_scale), .01, 0, 2)) {
+		ImGui::Text((std::to_string(frame) + " samples").c_str());
+
+		if (ImGui::DragFloat2("scale", glm::value_ptr(image_scale), .01, 0.01, 2)) {
 			OnResize(image_resolution);
 		}
+		ImGui::DragInt("samples", &samples, 1, 1, std::numeric_limits<int>::max());
 
 		if (ImGui::Checkbox("render depth? [WIP]", &depth_only)) {
 			ResetFrameIndex();
