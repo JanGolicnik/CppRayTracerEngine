@@ -86,6 +86,8 @@ namespace MyPBRT {
 		glm::vec3 color(0.0f);
 		glm::vec3 contribution(1.0f);
 
+		float prev_pdf = 1;
+
 		while (depth < bounces) {
 			depth++;
 
@@ -112,6 +114,7 @@ namespace MyPBRT {
 				interaction.normal = -interaction.normal;
 			}
 
+			if (active_scene->materials.size() == 0) return glm::vec3(1, 0, 1);
 			const std::shared_ptr<Material>& material = active_scene->materials[active_scene->objects[interaction.primitive].material];
 			
 			color += material->EvaluateLight(interaction);
@@ -140,11 +143,12 @@ namespace MyPBRT {
 				}
 			material:
 				ray->d = d;
-				float pdf = material->Pdf_Value(ray->d, interaction.normal);
-				contribution *= materialColor / pdf;
+				contribution *= materialColor / prev_pdf;
+				prev_pdf = material->Pdf_Value(ray->d, interaction.normal);
 			}
 			else {
-				contribution *= materialColor;
+				contribution *= materialColor / prev_pdf;
+				prev_pdf = 1;
 			}
 
 			ray->o = interaction.pos + ray->d * 0.0001f;
@@ -324,7 +328,7 @@ namespace MyPBRT {
 		ResetFrameIndex();
 	}
 
-	uint32_t* Integrator::GetImage()
+	uint32_t* Integrator::GetImage(bool overlays)
 	{
 		float inverse_frame = 1.0f / (float)frame;
 		for (int x = 0; x < render_resolution.x; x++) {
@@ -339,7 +343,7 @@ namespace MyPBRT {
 				output_image[x + y * render_resolution.x] = ToUint(glm::vec4(glm::vec3(pixel.r, pixel.g, pixel.b) * inverse_frame, 1.0f));
 			}
 		}
-		if (draw_overlays)
+		if (overlays)
 			DrawOverlays();
 		return output_image;
 	}
@@ -369,7 +373,6 @@ namespace MyPBRT {
 		if (ImGui::DragFloat2("scale", glm::value_ptr(image_scale), .01, 0.01, 2)) {
 			OnResize(image_resolution);
 		}
-		ImGui::DragInt("samples", &samples, 1, 1, std::numeric_limits<int>::max());
 
 		if (ImGui::Checkbox("render depth? [WIP]", &depth_only)) {
 			ResetFrameIndex();

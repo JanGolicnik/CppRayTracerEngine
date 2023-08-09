@@ -34,6 +34,8 @@ namespace MyPBRT {
 				glm::ivec2 screen_positon;
 			};
 			float depth;
+			//in case of overlap
+			float order;
 		};
 
 		int bounces;
@@ -60,7 +62,7 @@ namespace MyPBRT {
 		glm::vec3 TraceRay(Ray* ray, int depth = 0) const;
 		void ResetFrameIndex() { frame = 0; }
 		void OnResize(const glm::ivec2& size);
-		uint32_t* GetImage();
+		uint32_t* GetImage(bool overlays = true);
 		void Clear();
 
 		void RenderRayTraced();
@@ -70,7 +72,9 @@ namespace MyPBRT {
 		void CreateIMGUI();
 
 		glm::ivec2 ScaledResolution() { return render_resolution; }
+		const glm::ivec2& ScaledResolution() const { return render_resolution; }
 		glm::ivec2 Resolution() { return image_resolution; }
+		const glm::ivec2& Resolution() const { return image_resolution; }
 
 		std::weak_ptr<Texture> GetWorldTexture() { return world_texture; }
 
@@ -78,7 +82,6 @@ namespace MyPBRT {
 		glm::ivec2 render_resolution;
 		glm::ivec2 image_resolution;
 		uint32_t frame = 0;
-		int samples = 100;
 
 		bool draw_overlays = true;
 

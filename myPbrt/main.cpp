@@ -139,7 +139,7 @@ int main(int, char**)
 
                 glm::ivec2 resolution = glm::ivec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y);
                 app.Update(dt, resolution);
-                refreshImage(app.GetImage(), app.scaled_resolution.x, app.scaled_resolution.y);
+                refreshImage(app.GetImage(), app.Resolution().x, app.Resolution().y);
                 ImGui::Image((void*)(intptr_t)image, ImVec2(resolution.x, resolution.y), ImVec2(0,1), ImVec2(1, 0));
 
                 handleInput();

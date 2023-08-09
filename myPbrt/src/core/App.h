@@ -16,8 +16,6 @@ namespace MyPBRT {
 	class App
 	{
 	public:
-		//overwritten every frame
-		glm::ivec2 scaled_resolution = glm::vec3(0);
 		glm::vec2 normalized_mouse_position = glm::vec2(0);
 
 	public:
@@ -33,7 +31,11 @@ namespace MyPBRT {
 		void MouseMoved(double xpos, double ypos);
 		void ScrollMoved(double offset);
 		
+		const glm::ivec2& Resolution() const { return integrator.ScaledResolution(); }
+
 		void CreateIMGUI();
+
+		void SaveRenderedImage(const std::string& path);
 
 	private:
 		Camera camera;
@@ -53,6 +55,9 @@ namespace MyPBRT {
 		bool holding_lmouse = false;
 
 		float afk_timer = 0;
+		bool should_rebuild = false;
+
+		std::string save_path = "";
 
 	private:
 		void IMGUISettings();

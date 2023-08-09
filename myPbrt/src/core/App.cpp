@@ -12,6 +12,9 @@
 
 #include "BVHAccelerator.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image/stb_image_write.h>
+
 namespace MyPBRT {
 
     App::App() : camera(50, 0.01, 100, 0, 0), integrator(8, { 1200, 720 }, SCREENSCALE) {
@@ -33,8 +36,7 @@ namespace MyPBRT {
             afk_timer = -300;
         }
         integrator.OnResize(resolution);
-        scaled_resolution = integrator.ScaledResolution();
-        camera.OnResize(scaled_resolution);
+        camera.OnResize(integrator.ScaledResolution());
         if (camera.Update(dt)) {
             integrator.ResetFrameIndex();
             integrator.Clear();
@@ -112,6 +114,13 @@ namespace MyPBRT {
         IMGUIRendering();
         IMGUISelection();
 	}
+
+    void App::SaveRenderedImage(const std::string& path)
+    {
+        glm::ivec2 res = integrator.ScaledResolution();
+        stbi_flip_vertically_on_write(1);
+        stbi_write_png(("images/" + path + ".png").c_str(), res.x, res.y, 4, integrator.GetImage(false), res.x * 4);
+    }
 
     void App::IMGUISettings()
     {
@@ -218,6 +227,14 @@ namespace MyPBRT {
     void App::IMGUIRendering()
     {
         ImGui::Begin("Rendering");
+
+        ImGui::InputText("file name", &save_path);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("saved to images folder");
+        }
+        if (ImGui::Button("Save")) {
+            SaveRenderedImage(save_path);
+        }
 
         integrator.CreateIMGUI();
         ImGui::End();
