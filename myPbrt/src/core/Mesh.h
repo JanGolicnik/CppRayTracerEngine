@@ -6,9 +6,11 @@
 #include "Integrator.h"
 #include <functional>
 
+#include <json/json.h>
+
 namespace MyPBRT {
 
-	class Mesh {
+	class Mesh : Serializable {
 	public:
 		struct Vertex {
 			glm::vec3 position;
@@ -17,8 +19,12 @@ namespace MyPBRT {
 			glm::vec3 tangent;
 			glm::vec3 bitangent;
 			void CreateIMGUI(const std::string& name);
+			Json::Value Serialize() const;
+			void DeSerialize(const Json::Value& node);
 		};
 
+	public:
+		static std::shared_ptr<Mesh> ParseMesh(const Json::Value& node);
 
 	public:
 		Mesh(const std::vector<Vertex>& _vertices, const std::vector<uint32_t>& _indices);
@@ -42,6 +48,14 @@ namespace MyPBRT {
 		std::vector < std::vector<std::pair<Integrator::RasterPixel, Integrator::RasterPixel>>> GetRasterizedEdges(const Camera& camera) const;
 
 		const Bounds& GetBounds() const { return bounds; }
+
+		void DeSerialize(const Json::Value& node) override;
+		Json::Value Serialize() const override;
+		std::string GetType() const { return "Mesh"; };
+		const std::vector<Vertex>& GetVertices() const { return vertices; };
+		std::vector<Vertex>& GetVertices() { return vertices; };
+		const std::vector<uint32_t>& GetIndices() const { return indices; };
+		std::vector<uint32_t>& GetIndices() { return indices; };
 
 	private:
 		std::vector<Vertex> vertices;

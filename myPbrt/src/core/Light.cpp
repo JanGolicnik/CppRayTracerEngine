@@ -70,4 +70,57 @@ namespace MyPBRT {
 		return changed;
 	}
 
+	void Light::DeSerialize(const Json::Value& node )
+	{
+		strength = node["strength"].asFloat();
+		int i = 0;
+		for (const auto& value : node["color"]) {
+			color[i++] = value.asFloat();
+		}
+	}
+
+	Json::Value Light::Serialize() const
+	{
+		Json::Value ret;
+		ret["strength"] = strength;
+		for (int i = 0; i < 3; i++)
+			ret["color"].append(color[i]);
+		return ret;
+	}
+
+	std::shared_ptr<Light> Light::ParseLight(const Json::Value& node)
+	{
+		std::shared_ptr<Light> ret;
+		if (node["type"] == "Spherical") {
+			ret = std::make_shared<SphericalLight>();
+		}
+		ret->DeSerialize(node);
+		return ret;
+	}
+
+	void SphericalLight::DeSerialize(const Json::Value& node)
+	{
+		Light::DeSerialize(node);
+		strength = node["radius"].asFloat();
+		int i = 0;
+		for (const auto& value : node["position"]) {
+			color[i++] = value.asFloat();
+		}
+	}
+
+	Json::Value SphericalLight::Serialize() const
+	{
+		Json::Value ret = Light::Serialize();
+		ret["type"] = GetType();
+		ret["radius"] = radius;
+		for (int i = 0; i < 3; i++)
+			ret["position"].append(position[i]);
+		return ret;
+	}
+
+	std::string SphericalLight::GetType() const
+	{
+		return "Spherical";
+	}
+
 }

@@ -7,6 +7,8 @@
 #include <imgui.h>
 #include <set>
 
+#include <fstream>
+
 namespace MyPBRT {
 
     float TriangleArea(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2)
@@ -14,6 +16,13 @@ namespace MyPBRT {
         //half of |AB x AC|
         float area = 0.5f * glm::length(glm::cross(p1 - p0, p2 - p0));
         return area;
+    }
+
+    std::shared_ptr<Mesh> Mesh::ParseMesh(const Json::Value& node)
+    {
+        std::shared_ptr<Mesh> ret(new Mesh({}, {}));
+        ret->DeSerialize(node);
+        return ret;
     }
 
     /*
@@ -424,6 +433,32 @@ namespace MyPBRT {
         return transformed_edges;
     }
 
+    void Mesh::DeSerialize(const Json::Value& node)
+    {
+        for (int i = 0; i < 3; i++)
+            position[i] = node["position"][i].asFloat();
+        for (int i = 0; i < 4; i++)
+            rotation[i] = node["rotation"][i].asFloat();
+        for (int i = 0; i < 3; i++)
+            scale[i] = node["scale"][i].asFloat();
+    }
+
+    Json::Value Mesh::Serialize() const
+    {
+        Json::Value ret;
+        ret["type"] = GetType();
+        for(int i = 0; i < 3; i++)
+            ret["position"].append(position[i]);
+        for (int i = 0; i < 4; i++)
+            ret["rotation"].append(rotation[i]);
+        for (int i = 0; i < 3; i++)
+            ret["scale"].append(scale[i]);
+        if(normal_map)
+            ret["normal map"] = normal_map->Serialize();
+        ret["normal map strength"] = normal_map_strength;
+        return ret;
+    }
+
     void Mesh::ApplyTransformation()
     {
         triangle_areas.reserve(ceil(indices.size()/3));
@@ -492,4 +527,25 @@ namespace MyPBRT {
         ImGui::DragFloat3(name.c_str(), glm::value_ptr(position), 0.01, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max());
     }
 
+    Json::Value Mesh::Vertex::Serialize() const
+    {
+        Json::Value ret;
+        for(int i = 0; i < 3; i++)
+            ret["position"].append(position[i]);
+        for (int i = 0; i < 3; i++)
+            ret["normal"].append(normal[i]);
+        for (int i = 0; i < 2; i++)
+            ret["uv"].append(uv[i]);
+        return ret;
+    }
+
+    void Mesh::Vertex::DeSerialize(const Json::Value& node)
+    {
+        for (int i = 0; i < 3; i++)
+            position[i] = node["position"][i].asFloat();
+        for (int i = 0; i < 3; i++)
+            normal[i] = node["normal"][i].asFloat();
+        for (int i = 0; i < 2; i++)
+            uv[i] = node["uv"][i].asFloat();
+    }
 }

@@ -49,15 +49,15 @@ namespace MyPBRT {
 		const std::string str_mat_opt[4] = { "Diffuse", "Emissive", "Metallic", "Glass" };
 		int current_selected_material_option = 0;
 
-		std::string obj_file_to_load = "";
-
 		bool holding_shift = false;
 		bool holding_lmouse = false;
 
 		float afk_timer = 0;
 		bool should_rebuild = false;
 
-		std::string save_path = "";
+		std::string obj_file_to_load = "";
+		std::string image_save_path = "";
+		std::string scene_foldername = "";
 
 	private:
 		void IMGUISettings();

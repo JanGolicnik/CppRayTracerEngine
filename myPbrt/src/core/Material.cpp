@@ -64,6 +64,22 @@ namespace MyPBRT {
 		float cosine_theta = glm::dot(glm::normalize(direction), normal);
 		return fmax(0, cosine_theta * INVPIf);
 	}
+	void DiffuseMaterial::DeSerialize(const Json::Value& node)
+	{
+		Material::DeSerialize(node);
+		roughness = node["roughness"].asFloat();
+		if(node["texture"].isNull() == false)
+			texture = Texture::ParseTexture(node["texture"]);
+	}
+	Json::Value DiffuseMaterial::Serialize() const
+	{
+		Json::Value ret = Material::Serialize();
+		ret["roughness"] = roughness;
+		if (texture)
+			ret["texture"] = texture->Serialize();
+		ret["type"] = GetType();
+		return ret;
+	}
 	glm::vec3 EmissiveMaterial::EvaluateLight(const SurfaceInteraction& interaction) const
 	{
 		if (texture) {
@@ -106,6 +122,29 @@ namespace MyPBRT {
 	float EmissiveMaterial::Pdf_Value(const glm::vec3& incoming, const glm::vec3& normal) const
 	{
 		return 0.0f;
+	}
+
+	void EmissiveMaterial::DeSerialize(const Json::Value& node)
+	{
+		Material::DeSerialize(node);
+		int i = 0;
+		for (auto& value : node["emission"]) {
+			emission[i] = value.asFloat();
+		}
+		if (node["texture"].isNull() == false)
+			texture = Texture::ParseTexture(node["texture"]);
+	}
+
+	Json::Value EmissiveMaterial::Serialize() const
+	{
+		Json::Value ret = Material::Serialize();
+		for (int i = 0; i < 3; i++) {
+			ret["emission"].append(emission[i]);
+		}
+		if (texture)
+			ret["texture"] = texture->Serialize();
+		ret["type"] = GetType();
+		return ret;
 	}
 
 	glm::vec3 MetallicMaterial::Evaluate(SurfaceInteraction* interaction) const
@@ -156,6 +195,24 @@ namespace MyPBRT {
 	{
 		float cosine_theta = glm::dot(glm::normalize(direction), normal);
 		return fmax(0, cosine_theta * INVPIf);
+	}
+
+	void MetallicMaterial::DeSerialize(const Json::Value& node)
+	{
+		Material::DeSerialize(node);
+		roughness = node["roughness"].asFloat();
+		if (node["texture"].isNull() == false)
+			texture = Texture::ParseTexture(node["texture"]);
+	}
+
+	Json::Value MetallicMaterial::Serialize() const
+	{
+		Json::Value ret = Material::Serialize();
+		ret["roughness"] = roughness;
+		if (texture)
+			ret["texture"] = texture->Serialize();
+		ret["type"] = GetType();
+		return ret;
 	}
 
 	glm::vec3 GlassMaterial::Evaluate(SurfaceInteraction* interaction) const
@@ -233,6 +290,62 @@ namespace MyPBRT {
 	{
 		float cosine_theta = glm::abs(glm::dot(glm::normalize(direction), normal));
 		return cosine_theta * INVPIf;
+	}
+
+	void GlassMaterial::DeSerialize(const Json::Value& node)
+	{
+		Material::DeSerialize(node);
+		ior = node["ior"].asFloat();
+		if(node["texture"].isNull() == false)
+			texture = Texture::ParseTexture(node["texture"]);
+		if (node["roughness map"].isNull() == false)
+			roughness_map = Texture::ParseTexture(node["roughness map"]);
+	}
+
+	Json::Value GlassMaterial::Serialize() const
+	{
+		Json::Value ret = Material::Serialize();
+		ret["ior"] = ior;
+		if(texture)
+			ret["texture"] = texture->Serialize();
+		if (roughness_map)
+			ret["roughness map"] = roughness_map->Serialize();
+		ret["type"] = GetType();
+		return ret;
+	}
+
+	void Material::DeSerialize(const Json::Value& node)
+	{
+		has_pdf = node["has pdf"].asBool();
+	}
+
+	Json::Value Material::Serialize() const
+	{
+		Json::Value ret;
+		ret["has pdf"] = has_pdf;
+		return ret;
+	}
+
+	std::shared_ptr<Material> Material::ParseMaterial(const Json::Value& node)
+	{
+		std::shared_ptr<Material> ret;
+		std::string type = node["type"].asString();
+
+		if (type == "Emissive") {
+			ret = std::make_shared<EmissiveMaterial>();
+		}
+		else if(type == "Diffuse") {
+			ret = std::make_shared<DiffuseMaterial>();
+		}
+		else if (type == "Metallic") {
+			ret = std::make_shared<MetallicMaterial>();
+		}
+		else if (type == "Glass") {
+			ret = std::make_shared<GlassMaterial>();
+		}
+
+		ret->DeSerialize(node);
+		return ret;
 	}
 
 }

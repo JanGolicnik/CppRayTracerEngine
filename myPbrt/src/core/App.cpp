@@ -12,6 +12,11 @@
 
 #include "BVHAccelerator.h"
 
+#include <json/json.h>
+#include <fstream>
+
+#include <filesystem>
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image/stb_image_write.h>
 
@@ -129,10 +134,48 @@ namespace MyPBRT {
         bool changed = ImGui::DragFloat("focal distance", &camera.GetFocalDistance(), 0.01, 0, std::numeric_limits<float>::max());
         changed |= ImGui::DragFloat("lens radius", &camera.GetLensRadius(), 0.01, 0, std::numeric_limits<float>::max());
         
+        if (ImGui::Button("Clear")) {
+            scene.Clear();
+            changed = true;
+        }
+
+        ImGui::InputText("file name", &scene_foldername);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("saved/loaded/merged from scenes folder (ex. \"crazy scene\")");
+        }
+        if (ImGui::Button("Save")) {
+            std::filesystem::create_directories("scenes/" + scene_foldername);
+            Json::Value root;
+            scene.Save("scenes/" + scene_foldername, root);
+            std::ofstream outFile("scenes/" + scene_foldername + "/data.json");
+            if (outFile.is_open()) {
+                Json::StreamWriterBuilder writer;
+                std::string jsonString = Json::writeString(writer, root);
+                outFile << jsonString;
+                outFile.close();
+            }
+        }
+        else {
+            bool load = ImGui::Button("Load");
+            if (load || ImGui::Button("Merge")) {
+                Json::CharReaderBuilder reader;
+                Json::Value root;
+                std::string errors;
+                std::ifstream inFile("scenes/" + scene_foldername + "/data.json");
+                if (Json::parseFromStream(reader, inFile, &root, &errors)) {
+                    if (load)
+                        scene.Load("scenes/" + scene_foldername, root);
+                    else
+                        scene.MergeLoad("scenes/" + scene_foldername, root);
+                }
+                changed = true;
+                inFile.close();
+            }
+
+        }
         if (changed) {
             integrator.ResetFrameIndex();
         }
-        
         ImGui::End();
     }
     void App::IMGUIScene()
@@ -144,7 +187,7 @@ namespace MyPBRT {
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Model name only (ex. \"cube\"), file must be in the models folder");
             if (ImGui::Button("Load")) {
-                scene.Load(obj_file_to_load);
+                scene.LoadOBJ(obj_file_to_load);
             }
         }
 
@@ -228,12 +271,12 @@ namespace MyPBRT {
     {
         ImGui::Begin("Rendering");
 
-        ImGui::InputText("file name", &save_path);
+        ImGui::InputText("file name", &image_save_path);
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("saved to images folder");
         }
         if (ImGui::Button("Save")) {
-            SaveRenderedImage(save_path);
+            SaveRenderedImage(image_save_path);
         }
 
         integrator.CreateIMGUI();

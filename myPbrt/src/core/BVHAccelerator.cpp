@@ -107,6 +107,7 @@ namespace MyPBRT {
 
 	void BVHAccelerator::PrintNode(int node, int depth)
 	{
+		if (totalNodes == 0) std::cout << "no primitives exist so no leaves were created\n";
 		if (node >= totalNodes) return;
 		int n = depth;
 		if (depth > 1) n++;

@@ -31,6 +31,49 @@ namespace MyPBRT {
 		ImGui::DragFloat("color", &value, 0.01, 0, std::numeric_limits<float>::max());
 	}
 
+	void ConstantTexture<float>::DeSerialize(const Json::Value& node)
+	{
+		value = node["value"].asFloat();
+	}
+
+	Json::Value ConstantTexture<float>::Serialize() const
+	{
+		Json::Value ret = Texture::Serialize();
+		ret["value"] = value;
+		ret["type"] = GetType();
+		return ret;
+	}
+	
+	void ConstantTexture<glm::vec2>::DeSerialize(const Json::Value& node)
+	{
+		for(int i = 0; i < 2; i++)
+			value[i] = node["value"][i].asFloat();
+	}
+
+	Json::Value ConstantTexture<glm::vec2>::Serialize() const
+	{
+		Json::Value ret = Texture::Serialize();
+		for (int i = 0; i < 2; i++)
+			ret["value"].append(value[i]);
+		ret["type"] = GetType();
+		return ret;
+	}
+	
+	void ConstantTexture<glm::vec3>::DeSerialize(const Json::Value& node)
+	{
+		for (int i = 0; i < 3; i++)
+			value[i] = node["value"][i].asFloat();
+	}
+
+	Json::Value ConstantTexture<glm::vec3>::Serialize() const
+	{
+		Json::Value ret = Texture::Serialize();
+		for (int i = 0; i < 3; i++)
+			ret["value"].append(value[i]);
+		ret["type"] = GetType();
+		return ret;
+	}
+
 	void ConstantTexture<glm::vec2>::CreateIMGUI()
 	{
 		ImGui::DragFloat2("color", glm::value_ptr(value), 0.01, 0, std::numeric_limits<float>::max());
@@ -54,9 +97,33 @@ namespace MyPBRT {
 		ImGui::DragFloat("scale", &scale, 0.01, 0, std::numeric_limits<float>::max());
 	}
 
+	void CheckerboardTexture::DeSerialize(const Json::Value& node)
+	{
+		Texture::DeSerialize(node);
+		scale = node["scale"].asFloat();
+	}
+
+	Json::Value CheckerboardTexture::Serialize() const
+	{
+		Json::Value ret = Texture::Serialize();
+		ret["scale"] = scale;
+		ret["type"] = GetType();
+		return ret;
+	}
+
 	glm::vec4 UVTexture::Evaluate(const SurfaceInteraction& interaction) const
 	{
 		return glm::vec4(interaction.uv.x, interaction.uv.y, 0, 1);
+	}
+
+	void UVTexture::DeSerialize(const Json::Value& node)
+	{
+		Texture::DeSerialize(node);
+	}
+
+	Json::Value UVTexture::Serialize() const
+	{
+		return Texture::Serialize();
 	}
 
 	ImageTexture::ImageTexture(std::vector<uint8_t> _data, uint32_t _width, uint32_t _height, uint8_t _channels, double _inverseMult)
@@ -116,6 +183,27 @@ namespace MyPBRT {
 	void ImageTexture::CreateIMGUI()
 	{
 		ImGui::Image((void*)(intptr_t)image, ImVec2(200, 200));
+	}
+
+	void ImageTexture::DeSerialize(const Json::Value& node)
+	{
+		data = { 0xff };
+		width = 1;
+		height = 1;
+		channels = 3;
+		//TODO
+	}
+
+	Json::Value ImageTexture::Serialize() const
+	{
+		Json::Value ret = Texture::Serialize();
+		ret["width"] = width;
+		ret["height"] = height;
+		ret["channels"] = channels;
+		ret["inverseMult"] = inverseMult;
+		for(const auto& d : data)
+			ret["data"].append(d);
+		return ret;
 	}
 
 	bool Texture::CreationMenuImGUI(int* selected_option, const std::vector<TextureType>& types)
@@ -204,6 +292,48 @@ namespace MyPBRT {
 
 		return std::shared_ptr<Texture>(new ImageTexture(data, width, height, channels));
 	}
+
+	std::shared_ptr<Texture> Texture::ParseTexture(const Json::Value& node)
+	{
+		std::shared_ptr<Texture> ret;
+		std::string type = node["type"].asString();
+
+		if (type == ConstantTexture<float>::GetType()) {
+			ret = std::make_shared<ConstantTexture<float>>();
+		}
+		else if (type == ConstantTexture<glm::vec2>::GetType()) {
+			ret = std::make_shared<ConstantTexture<glm::vec2>>();
+		}
+		else if (type == ConstantTexture<glm::vec3>::GetType()) {
+			ret = std::make_shared<ConstantTexture<glm::vec3>>();
+		}
+		else if (type == "Checkerboard") {
+			ret = std::make_shared<CheckerboardTexture>();
+		}
+		else if (type == "UV") {
+			ret = std::make_shared<UVTexture>();
+		}
+		else if (type == "Image") {
+			ret = std::make_shared<ImageTexture>();
+		}
+
+		ret->DeSerialize(node);
+		return ret;
+	}
+
+	template <>
+	std::string ConstantTexture<float>::GetType() {
+		return "ConstantFloat";
+	}
+	template <>
+	std::string ConstantTexture<glm::vec2>::GetType() {
+		return "ConstantVec2";
+	}
+	template <>
+	std::string ConstantTexture<glm::vec3>::GetType() {
+		return "ConstantVec3";
+	}
+
 
 }
 

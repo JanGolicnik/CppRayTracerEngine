@@ -4,6 +4,8 @@
 #include "Mesh.h"
 #include "BVHAccelerator.h"
 
+#include <json/json.h>
+
 namespace MyPBRT {
 
 struct Scene
@@ -21,9 +23,9 @@ struct Scene
 	void Preprocess();
 
 	void DrawLines(const glm::vec2& resolution, const Camera& camera, const glm::vec3& color, IntegratorSetPixelFunctionPtr set_function) const;
-
-	void Load(const std::string& path);
 	
+	void LoadOBJ(const std::string& filename);
+
 	void Build();
 
 	void AddObject(const Object& object);
@@ -32,6 +34,11 @@ struct Scene
 
 	const Mesh& ObjectToMesh(int object) const;
 	Mesh& ObjectToMesh(int object);
+
+	void Clear();
+	void Save(const std::string& foldername, Json::Value& root) const;
+	void Load(const std::string& foldername, const Json::Value& node);
+	void MergeLoad(const std::string& foldername, const Json::Value& node);
 
 };
 }

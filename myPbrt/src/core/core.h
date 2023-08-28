@@ -47,6 +47,7 @@ namespace MyPBRT {
 	class UVTexture;
 	class ImageTexture;
 	class Pdf;
+	class Serializable;
 
 	using IntegratorSetPixelFunctionPtr = std::function<void(uint32_t, uint32_t, glm::vec4)>;
 
