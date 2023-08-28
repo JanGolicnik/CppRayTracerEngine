@@ -131,7 +131,7 @@ namespace MyPBRT {
 			file.write((const char*)&numVertices, sizeof(numVertices));
 			
 			const std::vector<uint32_t>& indices = mesh->GetIndices();
-			uint32_t numIndices = (uint32_t)(vertices.size());
+			uint32_t numIndices = (uint32_t)(indices.size());
 			file.write((const char*)&numIndices, sizeof(numIndices));
 
 			for (const auto& vertex : vertices) {
@@ -191,7 +191,7 @@ namespace MyPBRT {
 
 			std::vector<Mesh::Vertex> vertices;
 			vertices.resize(numVertices);
-			for (uint32_t v = 0; v < numVertices; ++v) {
+			for (int v = 0; v < numVertices; v++) {
 				file.read((char*)(&vertices[v].position), sizeof(glm::vec3));
 				file.read((char*)(&vertices[v].normal), sizeof(glm::vec3));
 				file.read((char*)(&vertices[v].uv), sizeof(glm::vec2));
@@ -199,7 +199,11 @@ namespace MyPBRT {
 
 			std::vector<uint32_t> indices;
 			indices.resize(numIndices);
-			file.read((char*)(indices.data()), numIndices * sizeof(uint32_t));
+			for (int j = 0; j < numIndices; j++) {
+				uint32_t data;
+				file.read((char*)(&data), sizeof(uint32_t));
+				indices.push_back(data);
+			}
 
 			vertices_per_mesh.push_back(vertices);
 			indices_per_mesh.push_back(indices);
