@@ -11,6 +11,8 @@ This is a C++ software raytracer that provides an interactive experience for cre
     Accelerated ray intersections with bounding volume heirarchies for real time performance.
     Saving and loading in json format.
 
+![Picture rendered with the engine](/myPbrt/images/bg4.png)
+
 ## Prerequisites
 
 Before you can build and run the raytracer, ensure you have the following dependencies installed:

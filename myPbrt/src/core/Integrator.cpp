@@ -367,38 +367,36 @@ namespace MyPBRT {
 	void Integrator::CreateIMGUI()
 	{
 		auto prevType = rendering_type;
-		
-		ImGui::Text((std::to_string(frame) + " samples").c_str());
-
-		if (ImGui::DragFloat2("scale", glm::value_ptr(image_scale), .01, 0.01, 2)) {
-			OnResize(image_resolution);
-		}
-
-		if (ImGui::Checkbox("render depth? [WIP]", &depth_only)) {
-			ResetFrameIndex();
-		}
 
 		ImGui::Combo("Engine ?", (int*)&rendering_type, rendering_options, IM_ARRAYSIZE(rendering_options));
-		
 		if (prevType != rendering_type) OnResize(image_resolution);
-
+		
 		switch (rendering_type) {
 		case MyPBRT::Integrator::RenderingType::PBR:
 			ImGui::DragInt("bounces", &bounces, 1, 0, std::numeric_limits<int>::max());
 			Texture::CreateTextureFromMenuFull(&selected_world_texture, &world_texture, world_texture_types);
 			break;
 		case MyPBRT::Integrator::RenderingType::Rasterized:
-			ImGui::ColorPicker3("Cool", glm::value_ptr(gooch_cool));
-			ImGui::ColorPicker3("Warm", glm::value_ptr(gooch_warm));
+			ImGui::ColorEdit3("Cool", glm::value_ptr(gooch_cool));
+			ImGui::ColorEdit3("Warm", glm::value_ptr(gooch_warm));
 			break;
 		case MyPBRT::Integrator::RenderingType::Wireframe:
-			ImGui::ColorPicker3("Color", glm::value_ptr(wireframe_color));
+			ImGui::ColorEdit3("Color", glm::value_ptr(wireframe_color));
 			break;
 		}
 
+		ImGui::Text((std::to_string(frame) + " samples").c_str());
+
+		if (ImGui::DragFloat2("scale", glm::value_ptr(image_scale), .01, 0.01, 2)) {
+			OnResize(image_resolution);
+		}
+
 		ImGui::Combo("Overlay ?", (int*)&overlay_type, overlay_options, IM_ARRAYSIZE(overlay_options));
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("selection outlines");
+		}
 		if (overlay_type == OverlayType::Selection || overlay_type == OverlayType::All) {
-			ImGui::ColorPicker3("Outline Color", glm::value_ptr(overlay_color));
+			ImGui::ColorEdit3("Outline Color", glm::value_ptr(overlay_color));
 		}
 	}
 

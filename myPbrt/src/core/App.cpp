@@ -29,6 +29,11 @@ namespace MyPBRT {
         std::shared_ptr<MyPBRT::Texture> st2(new ConstantTexture<float>(0));
 		std::shared_ptr<MyPBRT::Material> sphereMaterial2(new MyPBRT::GlassMaterial(st2));
 		scene.materials.push_back(sphereMaterial2);
+
+        std::filesystem::create_directories("scenes/");
+        std::filesystem::create_directories("images/");
+        std::filesystem::create_directories("models/");
+        std::filesystem::create_directories("textures/");
 	}
 
     App::~App() {}
@@ -132,14 +137,13 @@ namespace MyPBRT {
         ImGui::Begin("Settings");
 
         bool changed = ImGui::DragFloat("focal distance", &camera.GetFocalDistance(), 0.01, 0, std::numeric_limits<float>::max());
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("how far away the view is least blurry");
         changed |= ImGui::DragFloat("lens radius", &camera.GetLensRadius(), 0.01, 0, std::numeric_limits<float>::max());
-        
-        if (ImGui::Button("Clear")) {
-            scene.Clear();
-            changed = true;
-        }
+        if (ImGui::IsItemHovered()) 
+            ImGui::SetTooltip("bigger means more blur");
 
-        ImGui::InputText("file name", &scene_foldername);
+        ImGui::InputText("saved name", &scene_foldername);
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("saved/loaded/merged from scenes folder (ex. \"crazy scene\")");
         }
@@ -173,6 +177,11 @@ namespace MyPBRT {
             }
 
         }
+        if (ImGui::Button("Clear")) {
+            scene.Clear();
+            changed = true;
+        }
+
         if (changed) {
             integrator.ResetFrameIndex();
         }
@@ -271,7 +280,7 @@ namespace MyPBRT {
     {
         ImGui::Begin("Rendering");
 
-        ImGui::InputText("file name", &image_save_path);
+        ImGui::InputText("saved image name", &image_save_path);
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("saved to images folder");
         }
